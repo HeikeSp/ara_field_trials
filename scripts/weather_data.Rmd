@@ -1,0 +1,235 @@
+---
+title: "Weather Data"
+author: "Heike Sprenger"
+date: "Tuesday, May 05, 2015"
+output: html_document
+---
+
+### Set working directory  
+```{r set working directory}
+#getwd()
+setwd("D:/work/repos/ara_field_trials/")
+```
+
+### Load workspace, packages and scripts
+```{r load workspace}
+# load packages
+library(knitr)
+library(pander)
+
+# set options for knitr
+opts_chunk$set(fig.width=10, fig.height=5)
+opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
+
+# load workspace
+#load()
+```
+
+### Load weather data
+```{r load weather data}
+wetter=read.table("data/WetterR.txt", header=TRUE, sep="\t")
+pander(head(wetter))
+```
+
+
+```{r date format}
+## Umwandeln des Faktors in eine Zeichenkette
+class(wetter$Datum)
+
+Date <- as.character(wetter$Datum)
+class(Date)
+head(Date)
+
+## Umwandeln der Zeichenkette fuer Date_Time in POSIX Format
+Date_converted = strptime(Date, "%d.%m.%Y")
+class(Date_converted)
+
+## komplette Zeitangabe
+head(Date_converted) 
+
+## nur Datum
+head(as.Date(Date_converted)) 
+```
+
+
+```{r subsets per year}
+wetter_feld2 <- subset(wetter, wetter$Feld=="Feld2")
+wetter_feld3 <- subset(wetter, wetter$Feld=="Feld3")
+wetter_feld4 <- subset(wetter, wetter$Feld=="Feld4")
+
+Date_feld2 <- strptime( as.character(wetter_feld2$Datum), "%d.%m.%Y")
+Date_feld3 <- strptime( as.character(wetter_feld3$Datum), "%d.%m.%Y")
+Date_feld4 <- strptime( as.character(wetter_feld4$Datum), "%d.%m.%Y")
+```
+
+
+### Temperature
+
+#### plot
+```{r temperature plot}
+plot(Date_converted, wetter$Temp, type="n", main="temperature", xaxt="n", xlab="", ylab="temperature")
+
+tickpos <- seq(as.POSIXct("2007-10-01", tz="GMT"),
+               as.POSIXct("2010-04-30", tz="GMT"),
+               by="1 month")
+axis.POSIXct(side=1, at=tickpos, format = "%m-%Y", las=2)
+
+lines(Date_feld2, wetter_feld2$Temp, lwd=1)
+lines(Date_feld3, wetter_feld3$Temp, lwd=1)
+lines(Date_feld4, wetter_feld4$Temp, lwd=1)
+abline(h=0, col="red")
+
+abline(v=as.numeric(Date_feld2[213]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld3[1]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld3[212]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
+```
+
+
+
+#### test for signifcant differences between years
+```{r temperature t.test}
+############## Temperatur ################
+# Oktober bis April
+t.test(wetter$Temp[wetter$Feld=="Feld3"], wetter$Temp[wetter$Feld=="Feld4"])
+# p-value = 0.1101
+# mean of x  mean of y 
+# -0.4433962 -1.3929245 
+
+# Oktober bis März (ohne April)
+t.test(wetter$Temp[wetter$Feld=="Feld4"][1:182],wetter$Temp[wetter$Feld=="Feld3"][1:182])
+# p-value = 0.2118
+# mean of x mean of y 
+# -1.879121 -1.052198 
+
+# --> kein signifikanter Unterschied im Mittelwert
+
+# meterolog. Winter-Definition: 1.Dezember bis 28. Februar
+t.test(wetter$Temp[wetter$Feld=="Feld3"][62:151], wetter$Temp[wetter$Feld=="Feld4"][62:151])
+# p-value = 0.04363
+# mean of x mean of y 
+# -4.210000 -5.944444 
+```
+
+
+### Snow depth
+
+#### plot
+```{r snow depth plot}
+# plot(Date_converted, wetter$Schnee, type="n", main="snow depth", xaxt="n", xlab="", ylab="snow depth")
+# 
+# tickpos <- seq(as.POSIXct("2007-10-01", tz="GMT"),
+#                as.POSIXct("2010-04-30", tz="GMT"),
+#                by="1 month")
+# axis.POSIXct(side=1, at=tickpos, format = "%m-%Y", las=2)
+# 
+# lines(Date_feld2, wetter_feld2$Schnee, lwd=1)
+# lines(Date_feld3, wetter_feld3$Schnee, lwd=1)
+# lines(Date_feld4, wetter_feld4$Schnee, lwd=1)
+# 
+# abline(v=as.numeric(Date_feld2[213]), lty=2, col='grey')
+# abline(v=as.numeric(Date_feld3[1]), lty=2, col='grey')
+# abline(v=as.numeric(Date_feld3[212]), lty=2, col='grey')
+# abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
+# abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
+
+####################
+
+# all together
+plot(Date_converted, wetter$Schnee, type="h", xaxt="n", xlab="", ylab="snow depth", main="snow depth")
+
+tickpos <- seq(as.POSIXct("2007-10-01", tz="GMT"),
+               as.POSIXct("2010-04-30", tz="GMT"),
+               by="1 month")
+axis.POSIXct(side=1, at=tickpos, format = "%m-%Y", las=2)
+
+abline(v=as.numeric(Date_feld2[213]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld3[1]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld3[212]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
+```
+
+
+#### test for signifcant differences between years
+```{r snow depth t-test}
+# pdf("figures/SnowDepth.pdf", height=16, width=12)
+# par(mfrow=c(2,1))
+# barplot(height=schnee$V2, width=c(0.833), col="light grey", ylim=c(0,40), main="Schneetiefe 2009/10", ylab="Schneetiefe in cm", xlab="Monat", xaxt="n", border=T)
+# axis(at=seq(1:212), labels=c(rep("",14),"Oktober",rep("",30),"November",rep("",29),"Dezember",rep("",30),"Januar",rep("",29),"Februar",rep("",28),"März",rep("",30),"April",rep("",15) ), side=1, hadj=1, padj=1, cex.axis=0.7, las=2, lwd.ticks=0, pos=0)
+# abline(v=c(0,31,61,92,123,151,182,212), col="grey")
+# dev.off()      
+
+
+t.test(wetter$Schnee[wetter$Feld=="Feld3"], wetter$Schnee[wetter$Feld=="Feld4"])
+# p-value = 7.989e-12
+# mean of x mean of y 
+# 1.358491  7.792453  
+
+# --> deutlicher Unterschied bezüglich der Schneedecke
+```
+
+
+### Sunshine
+
+#### plot
+```{r sunshine plot}
+# plot(Date_converted, wetter$Sonne, type="n", main="temperature", xaxt="n", xlab="", ylab="temperature")
+# 
+# tickpos <- seq(as.POSIXct("2007-10-01", tz="GMT"),
+#                as.POSIXct("2010-04-30", tz="GMT"),
+#                by="1 month")
+# axis.POSIXct(side=1, at=tickpos, format = "%m-%Y", las=2)
+# 
+# plot(Date_feld2, wetter_feld2$Sonne, type="h")
+# plot(Date_feld3, wetter_feld3$Sonne, type="h")
+# plot(Date_feld4, wetter_feld4$Sonne, type="h")
+
+####################
+
+# all together
+plot(Date_converted, wetter$Sonne, type="h", xaxt="n", xlab="", ylab="sunshine", main="sunshine")
+
+tickpos <- seq(as.POSIXct("2007-10-01", tz="GMT"),
+               as.POSIXct("2010-04-30", tz="GMT"),
+               by="1 month")
+axis.POSIXct(side=1, at=tickpos, format = "%m-%Y", las=2)
+
+abline(v=as.numeric(Date_feld2[213]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld3[1]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld3[212]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
+abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
+```
+
+#### test for signifcant differences between years
+```{r sunshine t-test}
+
+# Oktober bis April
+t.test(wetter$Sonne[wetter$Feld=="Feld3"], wetter$Sonne[wetter$Feld=="Feld4"])  
+# p-value = 0.1648
+# mean of x mean of y 
+# 193.5566  163.5849 
+
+# --> kein signifikanter Unterschied bezüglich der Sonnenscheindauer
+
+# Oktober bis März (ohne April)
+t.test(wetter$Sonne[wetter$Feld=="Feld4"][1:182],wetter$Sonne[wetter$Feld=="Feld3"][1:182])
+#t = -0.4463, df = 360.808, p-value = 0.6556
+#mean of x mean of y 
+# 119.0440  126.6923 
+
+# meterolog. Winter-Definition: 1.Dezember bis 28. Februar
+t.test(wetter$Sonne[wetter$Feld=="Feld3"][62:151], wetter$Sonne[wetter$Feld=="Feld4"][62:151])
+#t = 1.4487, df = 166.047, p-value = 0.1493
+#mean of x mean of y 
+# 93.46667  66.00000 
+```
+
+
+## save workspace
+```{r save workspace}
+save.image("weather_data.RData")
+```
+
