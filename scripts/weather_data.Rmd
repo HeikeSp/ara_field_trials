@@ -16,13 +16,14 @@ setwd("D:/work/repos/ara_field_trials/")
 # load packages
 library(knitr)
 library(pander)
+library(ggplot2)
 
 # set options for knitr
 opts_chunk$set(fig.width=10, fig.height=5)
 opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
 
 # load workspace
-#load()
+load("weather_data.RData")
 ```
 
 ### Load weather data
@@ -57,9 +58,15 @@ wetter_feld2 <- subset(wetter, wetter$Feld=="Feld2")
 wetter_feld3 <- subset(wetter, wetter$Feld=="Feld3")
 wetter_feld4 <- subset(wetter, wetter$Feld=="Feld4")
 
+Date_all <- strptime( as.character(wetter$Datum), "%d.%m.%Y")
 Date_feld2 <- strptime( as.character(wetter_feld2$Datum), "%d.%m.%Y")
 Date_feld3 <- strptime( as.character(wetter_feld3$Datum), "%d.%m.%Y")
 Date_feld4 <- strptime( as.character(wetter_feld4$Datum), "%d.%m.%Y")
+
+wetter <- cbind(wetter, Date = Date_all)
+wetter_feld2 <- cbind(wetter_feld2, Date = Date_feld2)
+wetter_feld3 <- cbind(wetter_feld3, Date = Date_feld3)
+wetter_feld4 <- cbind(wetter_feld4, Date = Date_feld4)
 ```
 
 
@@ -86,6 +93,18 @@ abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
 abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
 ```
 
+
+```{r temperature ggplot2}
+ggplot(wetter_feld2, aes(Date, Temp)) + geom_line() + xlab("") + ylab("Temperature")
+
+ggplot(wetter_feld2, aes(Date, Temp)) + geom_line(data=wetter_feld2, aes(color="Field 2")) + 
+  xlab("") + ylab("Temperature") +
+  geom_line(data=wetter_feld3, aes(color="Field 3")) + 
+  geom_line(data=wetter_feld4, aes(color="Field 4")) +
+  labs(color="Field trial") 
+
+qplot(Date, Temp, data = wetter, geom = "line", group = Feld) + facet_grid(Feld ~ .) + scale_x_date(labels = date_format("%b"))
+```
 
 
 #### test for signifcant differences between years
