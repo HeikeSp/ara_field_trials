@@ -26,17 +26,112 @@ opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
 #load(".RData")
 ```
 
-### Load weather data
-```{r load weather data}
-wetter=read.table("data/WetterR.txt", header=TRUE, sep="\t")
-pander(head(wetter))
+### Load data
+```{r load data}
+metabolite_arafield4 <- read.table("data/Metabolite_AraField4.txt", header=TRUE, sep="\t")
+pander(metabolite_arafield4[1:5,1:10])
+
+lt50 <- read.table("data/LT50.txt", header=TRUE, sep="\t")
+pander(head(lt50))
 ```
 
 
+### Anthocyan score
+```{r anthocyan score}
+# gibt verschiedene Levels des Faktors "antho_value" --> Anthocyan-Score
+levels(metabolite_arafield4$antho_value)
+
+# Ordnen der Levels
+ordered_antho_value4=ordered(metabolite_arafield4$antho_value, levels=c("", "sehr gering", "gering", "mittel", "hoch", "sehr hoch"))
+
+# überprüfen, ob richtige Reihenfolge
+table(ordered_antho_value4)
+
+# Verbinden der Spalte der geordneten Anthocyan-Scores mit Tabelle
+metabolite_arafield4=cbind(metabolite_arafield4, 
+                           antho_value = ordered_antho_value4)
+
+# Anpassung der Spalten-Reihenfolge (Spalte 27 = anthovalue als 19. Spalte)
+metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:18,27,20:26)]])
+```
+
+
+## BBCH
+### Ranking BBCH
+```{r ranking BBCH}
+# rank(x, na.last = TRUE, ties.method = c("average", "first", "random", "max", "min"))
+# Returns the sample ranks of the values in a vector. Ties (i.e., equal values) and missing values can be handled in several ways. 
+
+# wobei NAs beibehalten werden (statt Rang für NA zu vergeben)
+rank_bbch_id4 <- rank(metabolite_arafield4$bbch_id, na.last="keep")    # keep NAs
+# Berechnung des gerankten BBCH in Prozent, wobei hier Rank 159 Maximum ist, also 100%
+percent_bbch_id4 <- rank_bbch_id4/159*100
+
+# Anfügen, Anordnen und Umbennen der Spalten
+metabolite_arafield4 <- cbind(metabolite_arafield4, 
+                              rank_bbch_id = rank_bbch_id4, 
+                              percent_bbch_id = percent_bbch_id4)
+metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:18,27,28,19:26)]])
+```
+
+
+### Median BBCH
+```{r median BBCH}
+# Median des gerankten BBCH (in %) für alle C24-Boxen
+c24_bbch4 <- median(metabolite_arafield4$percent_bbch_id[which(metabolite_arafield4$accession=="C24")])
+# 96.22642
+ 
+# Median des gerankten BBCH (in %) für alle Col-0-Boxen
+col0_bbch4 <- median(metabolite_arafield4$percent_bbch_id[which(metabolite_arafield4$accession %in% c("Col-0","Col-0-G1"))])
+# 61.63522
+```
+
+
+### Normalization BBCH
+Formel zur Normalisierung des BBCH Scoring anhand der Check-Kultivare C24 und Col-0 über verschiedene Feldversuche 
+BBCH(norm)(xi) = [RankBBCH (xi) - Median (RankBBCH(Col-0))]/[ Median(RankBBCH(C24)) - Median (RankBBCH(Col-0))] 
+also ergibt sich für Col-0 ein normierter Wert von 0  (insofern Col-0(i) = median(Col-0) 
+und für C24 1 (insofern C24(i) = median(C24)
+```{r normalization BBCH}
+norm_bbch_id4 <- (metabolite_arafield4$percent_bbch_id - col0_bbch4)/(c24_bbch4-col0_bbch4)
+metabolite_arafield4 <- cbind(metabolite_arafield4, 
+                              norm_bbch_id = norm_bbch_id4)
+
+metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:20,29,21:28)]])
+
+# sinnvoll hier zu skalieren?
+# scale_bbch4=scale(metabolite_arafield4$percent_bbch_id)
+```
+
+
+### Categories for BBCH
+```{r categories for BBCH}
+# Unterteilung des BBCH in 3 Kategorien, von 0 bis 49: vegetativ, von 50 bis 59: Blütenanlagen, ab 60: Blüte
+categories_bbch_id_arafield4 <- cut(metabolite_arafield4$bbch_id, 
+                                    breaks=c(0,49,59,100), ordered=T)
+levels(categories_bbch_id_arafield4) <- c("vegetativ","Blütenanlage","Blüte")
+
+# überprüfen, ob Klasse korrekt ist
+class(categories_bbch_id_arafield4)
+#[1] "ordered" "factor" 
+
+# überprüfen wie viele Pflanzen in jeder Kategorie sind
+table(categories_bbch_id_arafield4)
+
+# Anfügen der Spalte mit den Kategorien an die gesamte Tabelle
+metabolite_arafield4=cbind(metabolite_arafield4,
+                           bbch_categories = categories_bbch_id_arafield4)
+
+# überprüfen, ob Kategorien korrekt zugeordnet sind           
+pander(table(metabolite_arafield4$bbch_id, metabolite_arafield4$bbch_categories))
+
+# Anpassung der Spalten-Reihenfolge
+metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:21,30,22:29)]])
+```
 
 
 ## save workspace
 ```{r save workspace}
-#save.image(".RData")
+save.image("metabolite_arafield4.RData")
 ```
 
