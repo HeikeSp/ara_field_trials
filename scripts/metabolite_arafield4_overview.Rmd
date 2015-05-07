@@ -1,0 +1,42 @@
+---
+title: "Metabolite data Arabidopsis field trial 4 (2009/10)"
+author: "Heike Sprenger"
+date: "Tuesday, May 07, 2015"
+output: html_document
+---
+
+### Set working directory  
+```{r set working directory}
+#getwd()
+setwd("D:/work/repos/ara_field_trials/")
+```
+
+### Load workspace, packages and scripts
+```{r load workspace}
+# load packages
+library(knitr)
+library(pander)
+library(ggplot2)
+
+# set options for knitr
+opts_chunk$set(fig.width=10, fig.height=5)
+opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
+
+# load workspace
+#load(".RData")
+```
+
+### Load weather data
+```{r load weather data}
+wetter=read.table("data/WetterR.txt", header=TRUE, sep="\t")
+pander(head(wetter))
+```
+
+
+
+
+## save workspace
+```{r save workspace}
+#save.image(".RData")
+```
+
