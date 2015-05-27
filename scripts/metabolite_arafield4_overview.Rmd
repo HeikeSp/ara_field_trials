@@ -23,7 +23,7 @@ opts_chunk$set(fig.width=10, fig.height=5)
 opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
 
 # load workspace
-#load(".RData")
+#load("metabolite_arafield4.RData")
 ```
 
 ### Load data
@@ -42,17 +42,17 @@ pander(head(lt50))
 levels(metabolite_arafield4$antho_value)
 
 # Ordnen der Levels
-ordered_antho_value4=ordered(metabolite_arafield4$antho_value, levels=c("", "sehr gering", "gering", "mittel", "hoch", "sehr hoch"))
+ordered_antho_value4 <- ordered(metabolite_arafield4$antho_value, levels=c("", "sehr gering", "gering", "mittel", "hoch", "sehr hoch"))
 
 # überprüfen, ob richtige Reihenfolge
 table(ordered_antho_value4)
 
 # Verbinden der Spalte der geordneten Anthocyan-Scores mit Tabelle
-metabolite_arafield4=cbind(metabolite_arafield4, 
+metabolite_arafield4 <- cbind(metabolite_arafield4, 
                            antho_value = ordered_antho_value4)
 
 # Anpassung der Spalten-Reihenfolge (Spalte 27 = anthovalue als 19. Spalte)
-metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:18,27,20:26)]])
+metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1:18,27,20:26)]] )
 ```
 
 
@@ -71,7 +71,8 @@ percent_bbch_id4 <- rank_bbch_id4/159*100
 metabolite_arafield4 <- cbind(metabolite_arafield4, 
                               rank_bbch_id = rank_bbch_id4, 
                               percent_bbch_id = percent_bbch_id4)
-metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:18,27,28,19:26)]])
+
+metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1:18,27,28,19:26)]] )
 ```
 
 
@@ -97,7 +98,7 @@ norm_bbch_id4 <- (metabolite_arafield4$percent_bbch_id - col0_bbch4)/(c24_bbch4-
 metabolite_arafield4 <- cbind(metabolite_arafield4, 
                               norm_bbch_id = norm_bbch_id4)
 
-metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:20,29,21:28)]])
+metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1:20,29,21:28)]] )
 
 # sinnvoll hier zu skalieren?
 # scale_bbch4=scale(metabolite_arafield4$percent_bbch_id)
@@ -119,15 +120,43 @@ class(categories_bbch_id_arafield4)
 table(categories_bbch_id_arafield4)
 
 # Anfügen der Spalte mit den Kategorien an die gesamte Tabelle
-metabolite_arafield4=cbind(metabolite_arafield4,
+metabolite_arafield4 <- cbind(metabolite_arafield4,
                            bbch_categories = categories_bbch_id_arafield4)
 
 # überprüfen, ob Kategorien korrekt zugeordnet sind           
 pander(table(metabolite_arafield4$bbch_id, metabolite_arafield4$bbch_categories))
 
 # Anpassung der Spalten-Reihenfolge
-metabolite_arafield4=(metabolite_arafield4[,names(metabolite_arafield4)[c(1:21,30,22:29)]])
+metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1:21,30,22:29)]] )
 ```
+
+
+### Change negative values in small positive values 
+1/10 of the minimal value
+Field 4 has only one negative value for fumarate
+Columns 7: Glc, 8: Frc, 9: Suc, 10: Raf, 11: AS, 12: Malate, 13: Fumarate, 14: Proline, 15: Anthocyanin
+```{r change negative values}
+
+orig.df4 <- metabolite_arafield4[,c(7:15)]
+nonNeg4 <- as.data.frame(apply(orig.df4, 2, function(col) 
+{
+  min.val <- min(col[col>0])
+  col[col<0] <- (min.val/10)
+	col # Column index
+}))
+
+# change column names
+cnames_nonNeg4 <- colnames(nonNeg4)
+cnames_nonNeg4 <- c("glucose_positive", "fructose_positive", "sucrose_positive",
+                    "raffinose_positive", "amino_acids_positive", "malate_positive", 
+                    "fumarate_positive", "proline_positive", "anthocyanin_positive")
+colnames(nonNeg4) <- cnames_nonNeg4
+
+# attach columns with non-negative values to table
+metabolite_arafield4 <- cbind(metabolite_arafield4, nonNeg4)
+```
+
+
 
 
 ## save workspace
