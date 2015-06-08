@@ -1,0 +1,317 @@
+---
+title: "Modelling of metabolite data Arabidopsis field trial 4 (2009/10)"
+author: "Heike Sprenger"
+date: "Monday, June 07, 2015"
+output: html_document
+---
+
+### Set working directory  
+```{r set working directory}
+#getwd()
+setwd("D:/work/repos/ara_field_trials/")
+```
+
+### Load workspace, packages and scripts
+```{r load workspace}
+# load packages
+library(knitr)
+library(pander)
+library(ggplot2)
+library(DAAG)
+library(leaps)
+library(faraway)
+
+# set options for knitr
+opts_chunk$set(fig.width=10, fig.height=5)
+opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
+
+# load workspace
+#load("metabolite_arafield4.RData")
+```
+
+
+### Load data
+```{r load data}
+# metabolite_arafield4 <- read.table("output/metabolite_arafield4.txt"", header=TRUE, sep="\t")
+```
+
+
+### Exclude NAs for LT50 and anthoscore
+```{r exclude NAs}
+length( which( is.na(metabolite_arafield4$LT50ACC) ) )
+length( which( !is.na(metabolite_arafield4$LT50ACC) ) )
+
+idx_LT50_4 <- which( !is.na(metabolite_arafield4$LT50ACC) & !is.na(metabolite_arafield4$anthoscore) )
+
+metabolite_arafield4_part <- metabolite_arafield4[idx_LT50_4,]
+
+colnames(metabolite_arafield4_part)
+```
+
+
+### dataset with outliers without NAs for LT50
+- using NORMALIZED BBCH!
+```{r dataset with outliers without NAs for LT50}
+# cat_bbch_id4 <- metabolite_arafield4_part$bbch_categories # vegetative, Blütenanlage oder Blüte
+
+# Dataframe für Regressionsmodell für LT50ACC
+arafield4_regressiondata <- data.frame(accession = metabolite_arafield4_part$accession, 
+                                       plant_name = metabolite_arafield4_part$plant_name,
+                                       yLT50ACC = metabolite_arafield4_part$LT50ACC, 
+                                       yLT50NAC = metabolite_arafield4_part$LT50NAC, 
+                                       glc = metabolite_arafield4_part$glucose_positive,
+                                       frc = metabolite_arafield4_part$fructose_positive, 
+                                       suc = metabolite_arafield4_part$sucrose_positive, 
+                                       raf = metabolite_arafield4_part$raffinose_positive, 
+                                       aa = metabolite_arafield4_part$amino_acids_positive, 
+                                       mal = metabolite_arafield4_part$malate_positive, 
+                                       fum = metabolite_arafield4_part$fumarate_positive, 
+                                       pro = metabolite_arafield4_part$proline_positive, 
+                                       antho = metabolite_arafield4_part$anthocyanin_positive, 
+                                       norm_bbch = metabolite_arafield4_part$norm_bbch_id, 
+                                       anthoscore = metabolite_arafield4_part$anthoscore)
+
+pander(head(arafield4_regressiondata))
+
+write.table(arafield4_regressiondata, "output/metabolite_arafield4_regressiondata.txt", sep="\t")
+```
+
+
+### first linear regression model without changes
+```{r first linear regression model without changes}
+arafield4_regressionACC <- lm(yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                antho + norm_bbch + anthoscore, data = arafield4_regressiondata)
+#Multiple R-squared: 0.371,     Adjusted R-squared: 0.2997
+
+
+# Unterschied zwischen anova- und summary-Signifikanzen: erstere geben an, ob ein Effekt signifikant zur Erklärung der Gesamtvarianz beiträgt.
+# zweitere ist "nur" ein Test, ob die Steigung signifikant unterschiedlich von null ist
+
+anova(arafield4_regressionACC)
+# Analysis of Variance Table
+# Response: yLT50ACC
+#            Df  Sum Sq Mean Sq F value    Pr(>F)    
+# glc         1   4.568   4.568  1.9845   0.16211    
+# frc         1  12.091  12.091  5.2535   0.02406 *  
+# suc         1   0.679   0.679  0.2952   0.58818    
+# raf         1  50.565  50.565 21.9698 9.044e-06 ***
+# aa          1   0.289   0.289  0.1255   0.72394    
+# mal         1   0.914   0.914  0.3971   0.53007    
+# fum         1  12.314  12.314  5.3503   0.02283 *  
+# pro         1   2.928   2.928  1.2721   0.26216    
+# antho       1   2.905   2.905  1.2622   0.26400    
+# norm_bbch   1  41.786  41.786 18.1553 4.718e-05 ***
+# anthoscore  1   2.666   2.666  1.1585   0.28445    
+# Residuals  97 223.253   2.302                      
+# ---
+# Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1 
+
+summary(arafield4_regressionACC)
+# Call:
+# lm(formula = yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum + 
+#     pro + antho + norm_bbch + anthoscore, data = arafield4_regressiondata)
+# Residuals:
+#     Min      1Q  Median      3Q     Max 
+# -3.2839 -1.1444  0.1934  0.9903  3.9467 
+# Coefficients:
+#              Estimate Std. Error t value Pr(>|t|)    
+# (Intercept) -7.020469   1.094863  -6.412 5.22e-09 ***
+# glc          0.009013   0.035841   0.251  0.80198    
+# frc          0.036874   0.055818   0.661  0.51043    
+# suc          0.032673   0.036558   0.894  0.37367    
+# raf         -1.146965   0.316838  -3.620  0.00047 ***
+# aa          -0.037530   0.055766  -0.673  0.50255    
+# mal          0.003516   0.030471   0.115  0.90838    
+# fum         -0.065521   0.038912  -1.684  0.09543 .  
+# pro          2.482867   2.505034   0.991  0.32408    
+# antho        0.175405   0.155569   1.128  0.26231    
+# norm_bbch    0.961465   0.223626   4.299 4.08e-05 ***
+# anthoscore  -0.232878   0.216365  -1.076  0.28445    
+# ---
+# Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+# Residual standard error: 1.517 on 97 degrees of freedom
+# Multiple R-squared:  0.371,  Adjusted R-squared:  0.2997 
+# F-statistic: 5.202 on 11 and 97 DF,  p-value: 2.184e-06
+```
+
+### cross-validation
+```{r cross-validation}
+arafield4_DAAGdata <- arafield4_regressiondata[,c(3:15)]
+
+# 5-fold cross-validation
+CVlm(df=arafield4_DAAGdata, arafield4_regressionACC, m=5)
+# Overall ms 
+#       2.86
+
+# Leave-One-Out-cross-validation (LOO-CV)
+CVlm(df=arafield4_DAAGdata, arafield4_regressionACC, m=109)
+# Overall ms 
+#       2.55 
+```
+
+
+### prediction of LT50 with model (for accessions that are included in the model = training data)
+```{r prediction of LT50 with model}
+# predictedLT50ACC4 <- arafield4_regressionACC$coefficients[1] + 
+#   arafield4_regressiondata$glc * arafield4_regressionACC$coefficients[2] +
+#   arafield4_regressiondata$frc*arafield4_regressionACC$coefficients[3] + 
+#   arafield4_regressiondata$suc*arafield4_regressionACC$coefficients[4] +
+#   arafield4_regressiondata$raf*arafield4_regressionACC$coefficients[5] + 
+#   arafield4_regressiondata$aa*arafield4_regressionACC$coefficients[6]+
+#   arafield4_regressiondata$mal*arafield4_regressionACC$coefficients[7] + 
+#   arafield4_regressiondata$fum*arafield4_regressionACC$coefficients[8] +
+#   arafield4_regressiondata$pro*arafield4_regressionACC$coefficients[9] + 
+#   arafield4_regressiondata$antho*arafield4_regressionACC$coefficients[10] +
+#   arafield4_regressiondata$norm_bbch*arafield4_regressionACC$coefficients[11] + 
+#   arafield4_regressiondata$anthoscore*arafield4_regressionACC$coefficients[12]
+
+# equals:
+arafield4_regressionACC$fitted.values
+
+cor(arafield4_regressionACC$fitted.values, yLT50ACC4)
+#0.609 bzw. R2 = 0.371
+
+plot(yLT50ACC4, arafield4_regressionACC$fitted.values, 
+     ylab="LT50ACC fitted values", 
+     xlab="LT50ACC measured values", 
+     xlim=c(-12.5,-5), ylim=c(-12.5,-5), pch = 19)
+abline(lm(arafield4_regressionACC$fitted.values ~ yLT50ACC4))
+lm(arafield4_regressionACC$fitted.values ~ yLT50ACC4)
+```
+
+### Prediction for test data
+```{r prediction for test data}
+# Test-Datensatz mit Akzessionen bekannter LT50-Werte (nicht im Modell enthalten)
+idx_test4 <- which(metabolite_arafield4$accession %in% c("Be-0","Bsch-2.2", "Bsch-2.78", "Je54", "RRS-7", "Ty-0", "Van-0"))
+metabolite_arafield4_prediction <- metabolite_arafield4[idx_test4,]
+
+# Dataframe mit Spalten für Vorhersage des LT50-Wertes (ACC)
+arafield4_predictiondata <- data.frame(acc = metabolite_arafield4_prediction$accession, 
+                                       plant_name = metabolite_arafield4_prediction$plant_name,
+                                       glc = metabolite_arafield4_prediction$glucose_positive, 
+                                       frc = metabolite_arafield4_prediction$fructose_positive, 
+                                       suc = metabolite_arafield4_prediction$sucrose_positive,
+                                       raf = metabolite_arafield4_prediction$raffinose_positive, 
+                                       aa = metabolite_arafield4_prediction$amino_acids_positive, 
+                                       mal = metabolite_arafield4_prediction$malate_positive,
+                                       fum = metabolite_arafield4_prediction$fumarate_positive, 
+                                       pro = metabolite_arafield4_prediction$proline_positive, 
+                                       antho = metabolite_arafield4_prediction$anthocyanin_positive,
+                                       norm_bbch = metabolite_arafield4_prediction$norm_bbch_id, 
+                                       anthoscore = metabolite_arafield4_prediction$anthoscore)
+
+write.table(arafield4_predictiondata, file="output/metabolite_arafield4_predictiondata.txt", sep="\t")
+
+# Vorhersage der LT50-Werte für ausgewählte Akzessionen mit Hilfe des berechneten Regressionsmodells
+# arafield4_predictionACC <- arafield4_regressionACC$coefficients[1] + 
+#   arafield4_predictiondata$glc*arafield4_regressionACC$coefficients[2] + 
+#   arafield4_predictiondata$frc*arafield4_regressionACC$coefficients[3] + 
+#   arafield4_predictiondata$suc*arafield4_regressionACC$coefficients[4] +
+#   arafield4_predictiondata$raf*arafield4_regressionACC$coefficients[5] + 
+#   arafield4_predictiondata$aa*arafield4_regressionACC$coefficients[6] +
+#   arafield4_predictiondata$mal*arafield4_regressionACC$coefficients[7] + 
+#   arafield4_predictiondata$fum*arafield4_regressionACC$coefficients[8] +
+#   arafield4_predictiondata$pro*arafield4_regressionACC$coefficients[9] + 
+#   arafield4_predictiondata$antho*arafield4_regressionACC$coefficients[10] +
+#   arafield4_predictiondata$norm_bbch*arafield4_regressionACC$coefficients[11] + 
+#   arafield4_predictiondata$anthoscore*arafield4_regressionACC$coefficients[12]
+
+# code above equals:
+arafield4_predictionACC <- predict(arafield4_regressionACC, arafield4_predictiondata)
+
+# mehr zum Thema Vorhersage und Konfidenz-Intervalle im Kapitel 3 im Buch Regression, Seite 123
+
+# Vorhersage mit 95%-Vorhersageintervall
+predict(arafield4_regressionACC, arafield4_predictiondata, interval="prediction")
+#       fit   lwr   upr
+# 1   -8.12 -11.2 -5.02
+# 2   -7.79 -10.9 -4.64
+# 3   -9.93 -13.0 -6.84
+# 4  -10.95 -14.2 -7.73
+# 5   -9.00 -12.2 -5.84
+# 6  -10.09 -13.3 -6.92
+# 7   -9.33 -12.5 -6.18
+# 8  -10.06 -13.2 -6.91
+# 9   -6.94 -10.8 -3.04
+# 10 -10.06 -13.3 -6.87
+# 11  -9.27 -12.4 -6.17
+# 12 -10.14 -13.4 -6.92
+# 13 -11.51 -14.8 -8.21
+# 14 -11.36 -14.6 -8.12
+
+# Vorhersage mit 95%-Konfidenzintervall
+predict(arafield4_regressionACC, arafield4_predictiondata, interval="confidence")
+#       fit    lwr    upr
+# 1   -8.12  -8.89  -7.36
+# 2   -7.79  -8.72  -6.87
+# 3   -9.93 -10.62  -9.24
+# 4  -10.95 -12.10  -9.81
+# 5   -9.00  -9.95  -8.05
+# 6  -10.09 -11.07  -9.11
+# 7   -9.33 -10.25  -8.41
+# 8  -10.06 -11.00  -9.13
+# 9   -6.94  -9.42  -4.46
+# 10 -10.06 -11.14  -8.99
+# 11  -9.27 -10.00  -8.54
+# 12 -10.14 -11.28  -9.00
+# 13 -11.51 -12.84 -10.18
+# 14 -11.36 -12.56 -10.16
+
+measuredLT50ACC <- c( -5.706,  -5.706, -9.132, -9.132, -9.132, -9.132, -7.212, -7.212, 
+                      -10.78, -10.78, -11.14, -11.14, -6.726, -6.726)
+
+arafield4_predictionACCtable <- cbind(arafield4_predictiondata,arafield4_predictionACC, 
+                                      measuredLT50ACC)[,c(1,14,15)]
+
+pander(arafield4_predictionACCtable)
+#          acc arafield4_predictionACC measuredLT50ACC
+# 1       Be-0                   -8.12           -5.71
+# 2       Be-0                   -7.79           -5.71
+# 3   Bsch-2.2                   -9.93           -9.13
+# 4   Bsch-2.2                  -10.95           -9.13
+# 5  Bsch-2.78                   -9.00           -9.13
+# 6  Bsch-2.78                  -10.09           -9.13
+# 7       Je54                   -9.33           -7.21
+# 8       Je54                  -10.06           -7.21
+# 9      RRS-7                   -6.94          -10.78
+# 10     RRS-7                  -10.06          -10.78
+# 11      Ty-0                   -9.27          -11.14
+# 12      Ty-0                  -10.14          -11.14
+# 13     Van-0                  -11.51           -6.73
+# 14     Van-0                  -11.36           -6.73
+
+
+write.table(arafield4_predictionACCtable, "output/arafield4_predictionACC.txt", sep="\t")
+
+sum(((arafield4_predictionACC)-(measuredLT50ACC))^2)
+# 91.8
+sum(((arafield4_predictionACC)-(measuredLT50ACC))^2) / sum((measuredLT50ACC)^2)
+# 0.0855
+
+# Vorhersage ist ganz okay für 5 von 6 Akzessionen, aber die Vorhersage für Van-0 ist komplett verschieden
+```
+
+### Cp-plot
+```{r Cp-plot}
+################### Cp-Plot ####################
+x <- as.matrix(arafield4_regressiondata[,c(5:15)]) # Create design matrix x
+#colnames(x)=c("Glucose","Fructose","Saccharose","Raffinose","Aminosäuren","Malat","Fumarat","Prolin","Anthocyane","BBCH (normalisiert)","Anthocyan-Gehalt (visuell)")
+y <- arafield4_regressiondata$yLT50ACC # Create response vector y
+leapsModels <- leaps(x, y, method="Cp", nbest=3, names=colnames(x))
+
+
+pdf(file="figures/Metabolite_AraField4_CpPlot.pdf")
+Cpplot(leapsModels)
+dev.off()
+
+adjr <- leaps(x, y, method="adjr2") # Check which model the adjusted R2 selects
+maxadjr(adjr, 8)
+```
+
+
+
+## save workspace
+```{r save workspace}
+save.image("metabolite_arafield4.RData")
+```
+
