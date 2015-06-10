@@ -20,6 +20,7 @@ library(ggplot2)
 library(DAAG)
 library(leaps)
 library(faraway)
+library(MASS)
 
 # set options for knitr
 opts_chunk$set(fig.width=10, fig.height=5)
@@ -306,8 +307,418 @@ dev.off()
 
 adjr <- leaps(x, y, method="adjr2") # Check which model the adjusted R2 selects
 maxadjr(adjr, 8)
+
+
+# y <- arafield4_regressiondata$yLT50ACC[cooks.distance(arafield4_regressionACC)<0.2]
+# x <- cbind(arafield4_regressiondata[,4:14])
+# x_part <- x[cooks.distance(arafield4_regressionACC)<0.2,]
+# a <- leaps(x_part, y)
+# b <- leaps(x, y, method="adjr2")
 ```
 
+
+### mit den Variablen norm_bbch und anthoscore als FAKTOR!
+```{r mit den Variablen norm_bbch und anthoscore als FAKTOR!}
+class(arafield4_regressiondata$anthoscore)
+#[1] "integer"
+class(arafield4_regressiondata$norm_bbch)
+#[1] "numeric"
+
+arafield4_regressionACC_factor <- lm(yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                       antho + factor(norm_bbch) + factor(anthoscore), 
+                                     data = arafield4_regressiondata)
+
+anova(arafield4_regressionACC_factor)
+# Analysis of Variance Table
+# Response: yLT50ACC
+#                    Df Sum Sq Mean Sq F value  Pr(>F)    
+# glc                 1    4.6     4.6    1.99  0.1616    
+# frc                 1   12.1    12.1    5.28  0.0240 *  
+# suc                 1    0.7     0.7    0.30  0.5875    
+# raf                 1   50.6    50.6   22.06 9.8e-06 ***
+# aa                  1    0.3     0.3    0.13  0.7235    
+# mal                 1    0.9     0.9    0.40  0.5294    
+# fum                 1   12.3    12.3    5.37  0.0228 *  
+# pro                 1    2.9     2.9    1.28  0.2615    
+# antho               1    2.9     2.9    1.27  0.2633    
+# factor(norm_bbch)   8   62.7     7.8    3.42  0.0018 ** 
+# factor(anthoscore)  4    5.7     1.4    0.62  0.6511    
+# Residuals          87  199.4     2.3                    
+# ---
+# Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
+sum(((predict(arafield4_regressionACC_factor, arafield4_predictiondata)) - (measuredLT50ACC))^2) / sum((measuredLT50ACC)^2)
+# 0.0765
+sum(((predict(arafield4_regressionACC_factor, arafield4_predictiondata)) - (measuredLT50ACC))^2) 
+# 82.1
+
+summary(arafield4_regressionACC_factor)
+# Call:
+# lm(formula = yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum + 
+#     pro + antho + factor(norm_bbch) + factor(anthoscore), data = arafield4_regressiondata)
+# Residuals:
+#    Min     1Q Median     3Q    Max 
+# -2.665 -0.998  0.071  0.797  4.134 
+# Coefficients:
+#                                     Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)                         -9.99110    1.60841   -6.21  1.7e-08 ***
+# glc                                 -0.02169    0.04157   -0.52   0.6032    
+# frc                                  0.04060    0.05996    0.68   0.5001    
+# suc                                  0.03818    0.03933    0.97   0.3344    
+# raf                                 -1.00777    0.35211   -2.86   0.0053 ** 
+# aa                                  -0.02485    0.05857   -0.42   0.6724    
+# mal                                  0.00657    0.03141    0.21   0.8349    
+# fum                                 -0.04687    0.04119   -1.14   0.2582    
+# pro                                  2.68719    2.72350    0.99   0.3265    
+# antho                                0.21042    0.16425    1.28   0.2036    
+# factor(norm_bbch)-1.58181818181818   0.30542    1.30536    0.23   0.8156    
+# factor(norm_bbch)-1.32727272727273   0.67885    1.20886    0.56   0.5759    
+# factor(norm_bbch)-0.818181818181818  0.66149    1.15896    0.57   0.5696    
+# factor(norm_bbch)0                   1.11134    1.16436    0.95   0.3425    
+# factor(norm_bbch)0.627272727272727   1.84827    1.23223    1.50   0.1373    
+# factor(norm_bbch)0.845454545454545   3.38409    1.38606    2.44   0.0167 *  
+# factor(norm_bbch)1                   3.70639    1.32203    2.80   0.0062 ** 
+# factor(norm_bbch)1.10909090909091    4.14217    2.09642    1.98   0.0513 .  
+# factor(anthoscore)2                  0.33471    0.86713    0.39   0.7004    
+# factor(anthoscore)3                  0.56982    0.88283    0.65   0.5203    
+# factor(anthoscore)4                  0.34243    0.94492    0.36   0.7179    
+# factor(anthoscore)5                 -0.36027    1.13801   -0.32   0.7523    
+# ---
+# Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+# 
+# Residual standard error: 1.51 on 87 degrees of freedom
+# Multiple R-squared:  0.438,  Adjusted R-squared:  0.303 
+# F-statistic: 3.23 on 21 and 87 DF,  p-value: 6.42e-05
+```
+
+
+### log transformation
+```{r log transformation}
+# Speichern der gemessenen Werte in Vektor und log-Transformation
+measuredLT50ACC <- c( -5.706,  -5.706, -9.132, -9.132, -9.132, -9.132, -7.212, -7.212, -10.78, -10.78, -11.14, -11.14, -6.726, -6.726)
+measuredLT50ACClog <- log(abs(measuredLT50ACC))
+
+# Modell mit logarithmierter Zielvariable yLT50
+arafield4_regressionACClog <- lm(log(abs(yLT50ACC)) ~ glc + frc + suc + raf + aa + mal + fum + 
+                                   pro + antho + norm_bbch + anthoscore, data = arafield4_regressiondata)
+arafield4_predictionACClog <- predict(arafield4_regressionACClog, arafield4_predictiondata)
+
+cbind(arafield4_predictiondata,arafield4_predictionACClog, measuredLT50ACClog)[,c(1,14,15)]
+#          acc arafield4_predictionACClog measuredLT50ACClog
+# 1       Be-0                       2.06               1.74
+# 2       Be-0                       2.03               1.74
+# 3   Bsch-2.2                       2.29               2.21
+# 4   Bsch-2.2                       2.40               2.21
+# 5  Bsch-2.78                       2.17               2.21
+# 6  Bsch-2.78                       2.30               2.21
+# 7       Je54                       2.22               1.98
+# 8       Je54                       2.31               1.98
+# 9      RRS-7                       1.93               2.38
+# 10     RRS-7                       2.31               2.38
+# 11      Ty-0                       2.21               2.41
+# 12      Ty-0                       2.30               2.41
+# 13     Van-0                       2.47               1.91
+# 14     Van-0                       2.44               1.91
+
+cbind(exp(arafield4_predictionACClog),exp(measuredLT50ACClog))
+#     [,1]  [,2]
+# 1   7.88  5.71
+# 2   7.60  5.71
+# 3   9.88  9.13
+# 4  11.08  9.13
+# 5   8.75  9.13
+# 6   9.97  9.13
+# 7   9.24  7.21
+# 8  10.08  7.21
+# 9   6.87 10.78
+# 10 10.11 10.78
+# 11  9.09 11.14
+# 12  9.93 11.14
+# 13 11.84  6.73
+# 14 11.46  6.73
+
+# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
+sum(((exp(arafield4_predictionACClog)) - (exp(measuredLT50ACClog)))^2) / sum((measuredLT50ACC)^2)
+# 0.0893
+sum(((exp(arafield4_predictionACClog)) - (exp(measuredLT50ACClog)))^2)
+# 95.9
+```
+
+
+## variable selection
+
+### forward selection
+```{r forward selection}
+# Create initial NULL model
+arafield4_regressionACC_null <- lm(yLT50ACC~1, data=arafield4_regressiondata)
+
+# Choose a model by AIC in a Stepwise Algorithm
+# Forward
+arafield4_regressionACC_fw <- step(arafield4_regressionACC_null, 
+                                   scope=formula(arafield4_regressionACC), 
+                                   direction="forward")
+
+# Step:  AIC=92.9
+# yLT50ACC ~ norm_bbch + raf + fum + suc
+#              Df Sum of Sq RSS  AIC
+# <none>                    233 92.9
+# + glc         1     2.340 231 93.8
+# + pro         1     2.281 231 93.8
+# + frc         1     2.266 231 93.8
+# + anthoscore  1     1.144 232 94.4
+# + antho       1     0.510 233 94.7
+# + aa          1     0.101 233 94.9
+# + mal         1     0.006 233 94.9
+
+summary(arafield4_regressionACC_fw)
+# Residual standard error: 1.5 on 104 degrees of freedom
+# Multiple R-squared:  0.343,  Adjusted R-squared:  0.318 
+# F-statistic: 13.6 on 4 and 104 DF,  p-value: 6.15e-09
+
+# Vorhersage-Werte für Ökotypen, die nicht im Modell sind
+predict(arafield4_regressionACC_fw, arafield4_predictiondata)
+
+# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert 
+sum(((predict(arafield4_regressionACC_fw, arafield4_predictiondata)) - (measuredLT50ACC))^2)
+# 89.5
+sum(((predict(arafield4_regressionACC_fw, arafield4_predictiondata)) - (measuredLT50ACC))^2)/ sum((measuredLT50ACC)^2)
+# 0.0834
+```
+
+
+### stepAIC
+#### default direction (if missing): backward!!!
+```{r selection in both directions}
+############  SELECTION in BOTH DIRECTIONS ###################
+# Without FACTOR!
+step(arafield4_regressionACC_null, 
+     scope=formula(arafield4_regressionACC), 
+     direction="both")
+# Step:  AIC=92.9
+# yLT50ACC ~ norm_bbch + raf + fum + suc
+# Call:
+# lm(formula = yLT50ACC ~ norm_bbch + raf + fum + suc, data = arafield4_regressiondata)
+# Coefficients:
+# (Intercept)    norm_bbch          raf          fum          suc  
+#     -7.2765       1.0280      -0.9556      -0.0720       0.0542  
+
+# das selbe Modell wie bei forward selection
+
+# Both directions, starting from Null model (FACTOR!)
+arafield4_regressionACC_factorAIC <- step(arafield4_regressionACC_null, 
+                                          scope=formula(arafield4_regressionACC_factor), 
+                                          direction="both")
+
+# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
+sum(((predict(arafield4_regressionACC_factorAIC, arafield4_predictiondata)) - (measuredLT50ACC))^2) / sum((measuredLT50ACC)^2)
+# 0.069
+sum(((predict(arafield4_regressionACC_factorAIC, arafield4_predictiondata)) - (measuredLT50ACC))^2)
+# 74.1
+
+# bind predicted and measured LT50ACC for accessions of test set
+cbind(arafield4_predictiondata, 
+      predictedLT50ACC = predict(arafield4_regressionACC_factorAIC, arafield4_predictiondata), 
+      measuredLT50ACC)[,c(1,14,15)]
+#          acc predictedLT50ACC measuredLT50ACC
+# 1       Be-0            -7.25           -5.71
+# 2       Be-0            -8.20           -5.71
+# 3   Bsch-2.2            -9.98           -9.13
+# 4   Bsch-2.2           -10.94           -9.13
+# 5  Bsch-2.78            -9.37           -9.13
+# 6  Bsch-2.78           -10.18           -9.13
+# 7       Je54            -9.26           -7.21
+# 8       Je54           -10.43           -7.21
+# 9      RRS-7            -8.53          -10.78
+# 10     RRS-7            -9.98          -10.78
+# 11      Ty-0            -9.63          -11.14
+# 12      Ty-0           -10.09          -11.14
+# 13     Van-0           -11.14           -6.73
+# 14     Van-0           -10.88           -6.73
+```
+
+
+### stepAIC default
+#### default direction (if missing): backward!!!
+```{r stepAIC default}
+arafield4_stepAIC_ACC <- stepAIC(arafield4_regressionACC)
+
+arafield4_stepAIC_ACC$coefficients
+# (Intercept)         frc         raf         fum         pro   norm_bbch 
+#     -7.5118      0.0558     -0.8974     -0.0873      2.7659      0.9638 
+
+# predited values for accessions that are included in the null model (training data)
+arafield4_stepAIC_ACC$fitted.values
+
+# predited values for accessions that are NOT included in the null model (test data)
+arafield4_prediction_stepAIC_ACC <- predict(arafield4_stepAIC_ACC, arafield4_predictiondata)
+ 
+cbind(arafield4_predictiondata, 
+      arafield4_prediction_stepAIC_ACC, 
+      measuredLT50ACC)[,c(1,14,15)]
+#          acc arafield4_prediction_stepAIC_ACC measuredLT50ACC
+# 1       Be-0                            -8.21           -5.71
+# 2       Be-0                            -8.04           -5.71
+# 3   Bsch-2.2                            -9.82           -9.13
+# 4   Bsch-2.2                           -10.56           -9.13
+# 5  Bsch-2.78                            -8.84           -9.13
+# 6  Bsch-2.78                            -9.57           -9.13
+# 7       Je54                            -9.13           -7.21
+# 8       Je54                           -10.25           -7.21
+# 9      RRS-7                            -6.63          -10.78
+# 10     RRS-7                           -10.43          -10.78
+# 11      Ty-0                            -9.08          -11.14
+# 12      Ty-0                            -9.85          -11.14
+# 13     Van-0                           -11.15           -6.73
+# 14     Van-0                           -10.99           -6.73
+
+# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
+sum(((arafield4_prediction_stepAIC_ACC) - (measuredLT50ACC))^2)
+# 88.4
+sum(((arafield4_prediction_stepAIC_ACC) - (measuredLT50ACC))^2)/ sum((measuredLT50ACC)^2)
+# 0.0823
+```
+
+
+### comparison of two models --> ANOVA
+```{r comparison of two models}
+# anova(arafield4_regressionACC, arafield4_stepAIC_ACC)
+# Analysis of Variance Table
+# 
+# Model 1: yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + antho + 
+#     norm_bbch + anthoscore
+# Model 2: yLT50ACC ~ frc + raf + fum + pro + norm_bbch
+#   Res.Df RSS Df Sum of Sq    F Pr(>F)
+# 1     97 223                         
+# 2    103 230 -6     -6.28 0.45   0.84
+
+# p-value > 0.05, also Annahme von H0, dass beide Modelle ähnlich
+```
+
+
+### backward selection
+```{r backward selection}
+step(arafield4_regressionACC, scope=formula(arafield4_regressionACC), direction="backward")
+# führt zum gleichen Ergebnis wir stepAIC, da bei step auch der AIC-Wert minimiert wird (backward)
+
+```
+
+
+### add quadratic term for norm_bbch
+#### increases R2 from 0.34 to 0.37
+```{r add quadratic term for norm_bbch}
+summary(lm(yLT50ACC ~ frc + raf + fum + poly(norm_bbch,2), data = arafield4_regressiondata))
+# Call:
+# lm(formula = yLT50ACC ~ frc + raf + fum + poly(norm_bbch, 2), 
+#     data = arafield4_regressiondata)
+# Residuals:
+#    Min     1Q Median     3Q    Max 
+# -3.154 -1.004  0.135  0.930  4.021 
+# Coefficients:
+#                     Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)          -7.6495     0.5646  -13.55  < 2e-16 ***
+# frc                   0.0447     0.0346    1.29    0.199    
+# raf                  -0.7717     0.2287   -3.37    0.001 ** 
+# fum                  -0.0658     0.0339   -1.94    0.055 .  
+# poly(norm_bbch, 2)1   8.2905     1.4813    5.60  1.8e-07 ***
+# poly(norm_bbch, 2)2   3.5948     1.5641    2.30    0.024 *  
+# ---
+# Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+# Residual standard error: 1.47 on 103 degrees of freedom
+# Multiple R-squared:  0.372,  Adjusted R-squared:  0.342 
+# F-statistic: 12.2 on 5 and 103 DF,  p-value: 2.62e-09
+
+
+testlm2 <- lm(I(1/yLT50ACC) ~ frc + raf + fum + poly(norm_bbch,2), data = arafield4_regressiondata)
+summary(lm(I(1/yLT50ACC) ~ frc + raf + fum + poly(norm_bbch,2), data = arafield4_regressiondata))
+```
+
+
+### regression modell for LT50NAC
+```{r regression modell for LT50NAC}
+############## Regressionsmodell für LT50NAC #######################
+arafield4_regressionNAC <- lm(yLT50NAC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                antho + norm_bbch + anthoscore, data = arafield4_regressiondata)
+
+summary(arafield4_regressionNAC)
+# Call:
+# lm(formula = yLT50NAC ~ glc + frc + suc + raf + aa + mal + fum + 
+#     pro + antho + norm_bbch + anthoscore, data = arafield4_regressiondata)
+# 
+# Residuals:
+#     Min      1Q  Median      3Q     Max 
+# -1.8135 -0.4997  0.0778  0.4670  1.9091 
+# 
+# Coefficients:
+#             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept) -5.33125    0.56514   -9.43  2.2e-15 ***
+# glc          0.02267    0.01850    1.23    0.223    
+# frc         -0.00334    0.02881   -0.12    0.908    
+# suc          0.00742    0.01887    0.39    0.695    
+# raf         -0.33558    0.16354   -2.05    0.043 *  
+# aa          -0.01578    0.02878   -0.55    0.585    
+# mal         -0.00922    0.01573   -0.59    0.559    
+# fum         -0.00404    0.02009   -0.20    0.841    
+# pro          1.42423    1.29303    1.10    0.273    
+# antho        0.15910    0.08030    1.98    0.050 .  
+# norm_bbch    0.26992    0.11543    2.34    0.021 *  
+# anthoscore  -0.16358    0.11168   -1.46    0.146    
+# ---
+# Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+# 
+# Residual standard error: 0.783 on 97 degrees of freedom
+# Multiple R-squared:  0.212,  Adjusted R-squared:  0.122 
+# F-statistic: 2.37 on 11 and 97 DF,  p-value: 0.0122
+
+# Vorhersage der LT50-Werte mit Hilfe des Modells (für Ökotypen, die im Modell enthalten sind)
+arafield4_regressionNAC$fitted.values
+
+cor(yLT50NAC4,arafield4_regressionNAC$fitted.values)
+# 0.46 bzw. R2 = 0.22
+```
+
+
+### LT50NAC for test data
+```{r LT50NAC for test data}
+# Test-Datensatz mit Akzessionen bekannter LT50-Werte (nicht im Modell enthalten)
+idx_test4 <- which(metabolite_arafield4$accession %in% c("Be-0","Bsch-2.2", "Bsch-2.78", "Je54", "RRS-7", "Ty-0", "Van-0"))
+metabolite_arafield4_prediction <- metabolite_arafield4[idx_test4,]
+
+# Dataframe mit Spalten für Vorhersage des LT50-Wertes
+arafield4_predictiondata=data.frame(acc=metabolite_arafield4_prediction$accession, plant_name=metabolite_arafield4_prediction$plant_name,
+glc=metabolite_arafield4_prediction$glucose_positive, frc=metabolite_arafield4_prediction$fructose_positive, suc=metabolite_arafield4_prediction$sucrose_positive,
+raf=metabolite_arafield4_prediction$raffinose_positive, aa=metabolite_arafield4_prediction$amino_acids_positive, mal=metabolite_arafield4_prediction$malate_positive,
+fum=metabolite_arafield4_prediction$fumarate_positive, pro=metabolite_arafield4_prediction$proline_positive, antho=metabolite_arafield4_prediction$anthocyanin_positive,
+norm_bbch=metabolite_arafield4_prediction$norm_bbch_id, anthoscore=metabolite_arafield4_prediction$anthoscore)
+
+# write.table(arafield4_predictiondata, file="Masterarbeit/Ergebnisse/arafield4_predictiondata.txt", sep="\t")
+
+# Vorhersage der LT50-Werte für ausgewählte Akzessionen mit Hilfe des berechneten Regressionsmodells
+arafield4_predictionNAC = arafield4_regressionNAC$coefficients[1] + arafield4_predictiondata$glc*arafield4_regressionNAC$coefficients[2] +
+ arafield4_predictiondata$frc*arafield4_regressionNAC$coefficients[3] + arafield4_predictiondata$suc*arafield4_regressionNAC$coefficients[4] +
+ arafield4_predictiondata$raf*arafield4_regressionNAC$coefficients[5] + arafield4_predictiondata$aa*arafield4_regressionNAC$coefficients[6]+
+ arafield4_predictiondata$mal*arafield4_regressionNAC$coefficients[7] + arafield4_predictiondata$fum*arafield4_regressionNAC$coefficients[8] +
+ arafield4_predictiondata$pro*arafield4_regressionNAC$coefficients[9] + arafield4_predictiondata$antho*arafield4_regressionNAC$coefficients[10] +
+ arafield4_predictiondata$norm_bbch*arafield4_regressionNAC$coefficients[11] + arafield4_predictiondata$anthoscore*arafield4_regressionNAC$coefficients[12]
+
+cbind(arafield4_predictiondata,arafield4_predictionNAC)[,c(1,14)]
+         acc arafield4_predictionNAC        measured LT50NAC
+#1       Be-0                   -5.42        -4.633
+#2       Be-0                   -5.38        -4.633
+#3   Bsch-2.2                   -5.85        -5.431
+#4   Bsch-2.2                   -6.15        -5.431
+#5  Bsch-2.78                   -5.74        -5.431
+#6  Bsch-2.78                   -6.11        -5.431
+#7       Je54                   -5.84        -5.28
+#8       Je54                   -5.65        -5.28
+#9      RRS-7                   -5.33        -5.979
+#10     RRS-7                   -5.91        -5.979
+#11      Ty-0                   -5.88        -5.592
+#12      Ty-0                   -6.45        -5.592
+#13     Van-0                   -6.51        -5.144
+#14     Van-0                   -6.49        -5.144
+
+```
 
 
 ## save workspace
