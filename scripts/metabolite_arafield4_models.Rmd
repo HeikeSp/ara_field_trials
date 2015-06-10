@@ -8,11 +8,11 @@ output: html_document
 ### Set working directory  
 ```{r set working directory}
 #getwd()
-setwd("D:/work/repos/ara_field_trials/")
+#setwd("D:/work/repos/ara_field_trials/")
 ```
 
 ### Load workspace, packages and scripts
-```{r load workspace}
+```{r load workspace, include=TRUE, message=FALSE}
 # load packages
 library(knitr)
 library(pander)
@@ -33,7 +33,7 @@ opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
 
 ### Load data
 ```{r load data}
-# metabolite_arafield4 <- read.table("output/metabolite_arafield4.txt"", header=TRUE, sep="\t")
+metabolite_arafield4 <- read.table("output/metabolite_arafield4.txt", header=TRUE, sep="\t")
 ```
 
 
@@ -45,6 +45,11 @@ length( which( !is.na(metabolite_arafield4$LT50ACC) ) )
 idx_LT50_4 <- which( !is.na(metabolite_arafield4$LT50ACC) & !is.na(metabolite_arafield4$anthoscore) )
 
 metabolite_arafield4_part <- metabolite_arafield4[idx_LT50_4,]
+
+yLT50ACC4 <- metabolite_arafield4_part$LT50ACC
+yLT50NAC4 <- metabolite_arafield4_part$LT50NAC
+
+yCapacity4 <- yLT50ACC4-yLT50NAC4
 
 colnames(metabolite_arafield4_part)
 ```
@@ -143,8 +148,11 @@ arafield4_DAAGdata <- arafield4_regressiondata[,c(3:15)]
 CVlm(df=arafield4_DAAGdata, arafield4_regressionACC, m=5)
 # Overall ms 
 #       2.86
+```
 
-# Leave-One-Out-cross-validation (LOO-CV)
+
+### Leave-One-Out-cross-validation (LOO-CV)
+```{r Leave-One-Out-cross-validation (LOO-CV), warning=FALSE, message=FALSE}
 CVlm(df=arafield4_DAAGdata, arafield4_regressionACC, m=109)
 # Overall ms 
 #       2.55 
@@ -167,7 +175,7 @@ CVlm(df=arafield4_DAAGdata, arafield4_regressionACC, m=109)
 #   arafield4_regressiondata$anthoscore*arafield4_regressionACC$coefficients[12]
 
 # equals:
-arafield4_regressionACC$fitted.values
+# arafield4_regressionACC$fitted.values
 
 cor(arafield4_regressionACC$fitted.values, yLT50ACC4)
 #0.609 bzw. R2 = 0.371
@@ -847,5 +855,10 @@ cbind(arafield4_predictiondata,
 ## save workspace
 ```{r save workspace}
 save.image("metabolite_arafield4.RData")
+```
+
+
+```{r}
+# knit2html("scripts/metabolite_arafield4_models.Rmd", output = "scripts/metabolite_arafield4_models.html")
 ```
 
