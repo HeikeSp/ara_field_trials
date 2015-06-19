@@ -20,7 +20,7 @@ library(ggplot2)
 
 # set options for knitr
 opts_chunk$set(fig.width=10, fig.height=5)
-opts_knit$set(root.dir = 'D:/work/repos/ara_field_trials/')
+opts_knit$set(root.dir = '../')
 
 # load workspace
 load("weather_data.RData")
