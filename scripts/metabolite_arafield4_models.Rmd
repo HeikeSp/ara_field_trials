@@ -38,7 +38,7 @@ metabolite_arafield4 <- read.table("output/metabolite_arafield4.txt", header=TRU
 
 
 ### Exclude NAs for LT50 and anthoscore
-```{r exclude NAs}
+```{r exclude NAs for LT50 and anthoscore}
 length( which( is.na(metabolite_arafield4$LT50ACC) ) )
 length( which( !is.na(metabolite_arafield4$LT50ACC) ) )
 
@@ -58,9 +58,9 @@ colnames(metabolite_arafield4_part)
 ### dataset with outliers without NAs for LT50
 - using NORMALIZED BBCH!
 ```{r dataset with outliers without NAs for LT50}
-# cat_bbch_id4 <- metabolite_arafield4_part$bbch_categories # vegetative, Blütenanlage oder Blüte
+# cat_bbch_id4 <- metabolite_arafield4_part$bbch_categories # vegetative, Bl?tenanlage oder Bl?te
 
-# Dataframe für Regressionsmodell für LT50ACC
+# Dataframe for regression model of LT50ACC
 arafield4_regressiondata <- data.frame(accession = metabolite_arafield4_part$accession, 
                                        plant_name = metabolite_arafield4_part$plant_name,
                                        yLT50ACC = metabolite_arafield4_part$LT50ACC, 
@@ -90,7 +90,7 @@ arafield4_regressionACC <- lm(yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum 
 #Multiple R-squared: 0.371,     Adjusted R-squared: 0.2997
 
 
-# Unterschied zwischen anova- und summary-Signifikanzen: erstere geben an, ob ein Effekt signifikant zur Erklärung der Gesamtvarianz beiträgt.
+# Unterschied zwischen anova- und summary-Signifikanzen: erstere geben an, ob ein Effekt signifikant zur Erklaerung der Gesamtvarianz beitraegt.
 # zweitere ist "nur" ein Test, ob die Steigung signifikant unterschiedlich von null ist
 
 anova(arafield4_regressionACC)
@@ -195,7 +195,7 @@ lm(arafield4_regressionACC$fitted.values ~ yLT50ACC4)
 idx_test4 <- which(metabolite_arafield4$accession %in% c("Be-0","Bsch-2.2", "Bsch-2.78", "Je54", "RRS-7", "Ty-0", "Van-0"))
 metabolite_arafield4_prediction <- metabolite_arafield4[idx_test4,]
 
-# Dataframe mit Spalten für Vorhersage des LT50-Wertes (ACC)
+# Dataframe mit Spalten f?r Vorhersage des LT50-Wertes (ACC)
 arafield4_predictiondata <- data.frame(acc = metabolite_arafield4_prediction$accession, 
                                        plant_name = metabolite_arafield4_prediction$plant_name,
                                        glc = metabolite_arafield4_prediction$glucose_positive, 
@@ -217,7 +217,7 @@ write.table(arafield4_predictiondata, file="output/metabolite_arafield4_predicti
 
 ### Prediction of LT50ACC test data
 ```{r prediction of LT50ACC for test data}
-# Vorhersage der LT50-Werte für ausgewählte Akzessionen mit Hilfe des berechneten Regressionsmodells
+# Vorhersage der LT50-Werte f?r ausgew?hlte Akzessionen mit Hilfe des berechneten Regressionsmodells
 # arafield4_predictionACC <- arafield4_regressionACC$coefficients[1] + 
 #   arafield4_predictiondata$glc*arafield4_regressionACC$coefficients[2] + 
 #   arafield4_predictiondata$frc*arafield4_regressionACC$coefficients[3] + 
@@ -303,14 +303,14 @@ sum(((arafield4_predictionACC)-(measuredLT50ACC))^2)
 sum(((arafield4_predictionACC)-(measuredLT50ACC))^2) / sum((measuredLT50ACC)^2)
 # 0.0855
 
-# Vorhersage ist ganz okay für 5 von 6 Akzessionen, aber die Vorhersage für Van-0 ist komplett verschieden
+# Vorhersage ist ganz okay f?r 5 von 6 Akzessionen, aber die Vorhersage f?r Van-0 ist komplett verschieden
 ```
 
 ### Cp-plot
 ```{r Cp-plot}
 ################### Cp-Plot ####################
 x <- as.matrix(arafield4_regressiondata[,c(5:15)]) # Create design matrix x
-#colnames(x)=c("Glucose","Fructose","Saccharose","Raffinose","Aminosäuren","Malat","Fumarat","Prolin","Anthocyane","BBCH (normalisiert)","Anthocyan-Gehalt (visuell)")
+#colnames(x)=c("Glucose","Fructose","Saccharose","Raffinose","Aminos?uren","Malat","Fumarat","Prolin","Anthocyane","BBCH (normalisiert)","Anthocyan-Gehalt (visuell)")
 y <- arafield4_regressiondata$yLT50ACC # Create response vector y
 leapsModels <- leaps(x, y, method="Cp", nbest=3, names=colnames(x))
 
@@ -490,7 +490,7 @@ summary(arafield4_regressionACC_fw)
 # Multiple R-squared:  0.343,  Adjusted R-squared:  0.318 
 # F-statistic: 13.6 on 4 and 104 DF,  p-value: 6.15e-09
 
-# Vorhersage-Werte für Ökotypen, die nicht im Modell sind
+# Vorhersage-Werte f?r ?kotypen, die nicht im Modell sind
 predict(arafield4_regressionACC_fw, arafield4_predictiondata)
 
 # Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert 
@@ -606,14 +606,14 @@ sum(((arafield4_prediction_stepAIC_ACC) - (measuredLT50ACC))^2)/ sum((measuredLT
 # 1     97 223                         
 # 2    103 230 -6     -6.28 0.45   0.84
 
-# p-value > 0.05, also Annahme von H0, dass beide Modelle ähnlich
+# p-value > 0.05, also Annahme von H0, dass beide Modelle ?hnlich
 ```
 
 
 ### backward selection
 ```{r backward selection}
 step(arafield4_regressionACC, scope=formula(arafield4_regressionACC), direction="backward")
-# führt zum gleichen Ergebnis wir stepAIC, da bei step auch der AIC-Wert minimiert wird (backward)
+# f?hrt zum gleichen Ergebnis wir stepAIC, da bei step auch der AIC-Wert minimiert wird (backward)
 
 ```
 
@@ -650,7 +650,7 @@ summary(lm(I(1/yLT50ACC) ~ frc + raf + fum + poly(norm_bbch,2), data = arafield4
 
 ### regression model for LT50NAC
 ```{r regression model for LT50NAC}
-############## Regressionsmodell für LT50NAC #######################
+############## Regressionsmodell f?r LT50NAC #######################
 arafield4_regressionNAC <- lm(yLT50NAC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
                                 antho + norm_bbch + anthoscore, data = arafield4_regressiondata)
 
@@ -684,7 +684,7 @@ summary(arafield4_regressionNAC)
 # Multiple R-squared:  0.212,  Adjusted R-squared:  0.122 
 # F-statistic: 2.37 on 11 and 97 DF,  p-value: 0.0122
 
-# Vorhersage der LT50-Werte mit Hilfe des Modells (für Ökotypen, die im Modell enthalten sind)
+# Vorhersage der LT50-Werte mit Hilfe des Modells (f?r ?kotypen, die im Modell enthalten sind)
 arafield4_regressionNAC$fitted.values
 
 cor(yLT50NAC4,arafield4_regressionNAC$fitted.values)
@@ -727,7 +727,7 @@ summary(arafield4_stepAIC_NAC)
 # Multiple R-squared:  0.196,  Adjusted R-squared:  0.157 
 # F-statistic: 5.03 on 5 and 103 DF,  p-value: 0.000368
 
-# für Ökotypen, die im Modell sind
+# f?r ?kotypen, die im Modell sind
 predictedLT50NAC4_stepAIC <- arafield4_stepAIC_NAC$coefficients[1] + 
   arafield4_regressiondata$glc*arafield4_stepAIC_NAC$coefficients[2] +
   arafield4_regressiondata$raf*arafield4_stepAIC_NAC$coefficients[3] + 
@@ -738,7 +738,7 @@ predictedLT50NAC4_stepAIC <- arafield4_stepAIC_NAC$coefficients[1] +
 # entspricht
 arafield4_stepAIC_NAC$fitted.values
 
-# für Ökotypen, die nicht im Modell sind
+# f?r ?kotypen, die nicht im Modell sind
 arafield4_prediction_stepAIC_NAC <- predict(arafield4_stepAIC_NAC, arafield4_predictiondata)
 
 cbind(arafield4_predictiondata, 
@@ -796,7 +796,7 @@ summary(arafield4_regressionCap)
 # Multiple R-squared:  0.346,  Adjusted R-squared:  0.272 
 # F-statistic: 4.67 on 11 and 97 DF,  p-value: 1.05e-05
 
-# Vorhersage der Kapazität mit Hilfe des Modells (für Ökotypen, die im Modell enthalten sind)
+# Vorhersage der Kapazit?t mit Hilfe des Modells (f?r ?kotypen, die im Modell enthalten sind)
 arafield4_regressionCap$fitted.values
 
 cor(yCapacity4,arafield4_regressionCap$fitted.values)
@@ -806,7 +806,7 @@ cor(yCapacity4,arafield4_regressionCap$fitted.values)
 
 ### prediction of capacity for test data
 ```{r prediction of capacity for test data}
-# Vorhersage der LT50-Werte für ausgewählte Akzessionen mit Hilfe des berechneten Regressionsmodells
+# Vorhersage der LT50-Werte f?r ausgew?hlte Akzessionen mit Hilfe des berechneten Regressionsmodells
 
 arafield4_predictionCap <- predict(arafield4_regressionCap, arafield4_predictiondata)
 
@@ -825,10 +825,10 @@ summary(arafield4_stepAIC_Cap)
 # Multiple R-squared:  0.334,  Adjusted R-squared:  0.308 
 # F-statistic:   13 on 4 and 104 DF,  p-value: 1.25e-08
 
-# für Ökotypen, die im Modell sind
+# f?r ?kotypen, die im Modell sind
 arafield4_stepAIC_Cap$fitted.values
 
-# für Ökotypen, die nicht im Modell sind
+# f?r ?kotypen, die nicht im Modell sind
 arafield4_prediction_stepAIC_Cap <- predict(arafield4_stepAIC_Cap, arafield4_predictiondata)
 
 cbind(arafield4_predictiondata, 
