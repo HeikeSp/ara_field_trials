@@ -1,0 +1,388 @@
+---
+title: "Untitled"
+author: "Heike Sprenger"
+date: "September 22, 2015"
+output: html_document
+---
+
+# Load data
+```{r load data}
+# reference table for sample information
+ref_gesamt_mittel <- read.table("data/gcms/ref_gesamt_mittel.txt", header=T, row.names=1, sep="\t")
+head(ref_gesamt_mittel)
+dim(ref_gesamt_mittel)
+# 150 accessions, 12 columns
+
+# metabolites ref table
+metabolites <- read.table("data/gcms/metabolites.txt", na.strings = "NA", sep = "\t", header=T)
+dim(metabolites)
+
+# all metabolite data: field3 + field4 --> MEAN values per accession and trial
+gesamt_mittel <- read.table("data/gcms/gesamt.txt", row.names = 1, na.strings = "NA", sep = "\t", header=T)
+dim(gesamt_mittel)
+# 117 metabolites, 150 accessions
+
+# field 3
+feld3_mittel <- read.table("data/gcms/feld3.txt", row.names = 1, na.strings = "NA", sep = "\t", header=T)
+dim(feld3_mittel)
+# 117 75
+
+# field 4
+feld4_mittel <- read.table("data/gcms/feld4.txt", row.names = 1, na.strings = "NA", sep = "\t", header=T)
+dim(feld4_mittel)
+# 117 75
+
+# transpose data sets
+gesamt_mittel.t <- t(gesamt_mittel)
+feld3_mittel.t <- t(feld3_mittel)
+feld4_mittel.t <- t(feld4_mittel)
+
+# accession names
+akzessionen <- colnames(gesamt_mittel)
+head(akzessionen)
+
+akzessionenfeld <- colnames(feld3_mittel)
+akzessionenfeld
+```
+
+
+# Load data without means
+For batch test, gesamt 15% NA, 50%Blank and replicates were not averaged ###
+```{r load data without means}
+gesamt_keinmittel <- read.table("data/gcms/gesamt_keineMittel.txt", 
+                                row.names = 1, na.strings = "NA", sep = "\t", header=T) # transformed data
+dim(gesamt_keinmittel)
+# 117 metabolites, 306 accessions
+akzessionen_keinmittel <- colnames(gesamt_keinmittel)
+akzessionen_keinmittel
+
+gesamt_keinmittel.t <- t(gesamt_keinmittel)
+dim(gesamt_keinmittel.t)
+# 306 117
+
+ref_keinmittel <- read.table("data/gcms/ref_gesamtKeineMittel.txt", na.strings = "NA", header = T, sep = "\t")
+dim(ref_keinmittel)
+# 306 6
+
+# number NAs
+sum(is.na(gesamt_mittel))
+# 257 
+sum(is.na(feld3_mittel))
+# 148 
+sum(is.na(feld4_mittel))
+# 109 
+sum(is.na(gesamt_keinmittel))
+# 2247
+```
+
+
+# Load data before log-median-ratio-transformation
+```{r load data before log-median-ratio-transformation}
+norm_keinmittel <- read.table("data/gcms/norm_keineMittelw_15%NA50%Blank.txt", 
+                                row.names = 1, na.strings = "NA", sep = "\t", header=T) # UN-transformed data
+
+dim(norm_keinmittel)
+# 117 rows (metabolites)
+# 306 columns (samples)
+
+heatmap.x  <- as.matrix(norm_keinmittel)
+
+range(heatmap.x, na.rm=T)
+# normalized up to 100% per sample (over all metabolites)
+
+hist(apply(heatmap.x, 2, max, na.rm=T), col = "grey", breaks=30, xlab = "maximal value")
+
+hv <- heatmap(heatmap.x, col = heat.colors(256), scale = "column", margins = c(5,10))
+hv <- heatmap(heatmap.x, col = heat.colors(256), scale = "row", margins = c(5,10))
+```
+
+
+
+# Outliers and distibution
+```{r Outlier and distribution}
+pdf("figures/gcms/boxplots.pdf", width=12, height=6)
+boxplot(gesamt_mittel, main = "Boxplots of LOG(10)-median-transformated data",
+        sub = "accessions", ylab = "LOG(10)-median-transform", xaxt = "n", col = c(rep("green",75), rep("blue",75)))
+axis(at = seq(1:150), labels = akzessionen, side = 1, las = 2, cex.axis = 0.5)
+
+boxplot(feld3_mittel, main = "Boxplots of LOG(10)-median-transformated data for field 3",
+        sub = "Akzessionen", ylab = "LOG(10)-median-transform", xaxt = "n")
+axis(at = seq(1:75), labels = akzessionenfeld, side = 1, las = 2, cex.axis = 0.5)
+
+boxplot(feld4_mittel, main = "Boxplots of LOG(10)-median-transformated data for field 4",
+        ylab = "LOG(10)-median-transform", xaxt = "n")
+axis(at = seq(1:75), labels = akzessionenfeld, side = 1, las = 2, cex.axis = 0.5)
+dev.off()
+
+pdf("figures/gcms/quantilplots.pdf")
+qqnorm(gesamt_mittel.t, main = "Normal quantil-quantil-plot of the data")
+qqnorm(feld3_mittel.t, main = "Normal quantil-quantil-plot of field 3")
+qqnorm(feld4_mittel.t, main = "Normal quantil-quantil-plot of field 4")
+dev.off()
+
+pdf("figures/gcms/histogramms.pdf")
+hist(gesamt_mittel.t, main = "Histogramm of the data", ylab = "density", 
+     xlab = "", freq = F, prob =T , ylim = c(0,2.5))
+lines(density(gesamt_mittel.t, na.rm = T))             
+hist(feld3_mittel.t, main = "Histogramm of field 3", ylab = "density", 
+     xlab = "", freq = F, prob = T, ylim = c(0,2.5))
+lines(density(feld3_mittel.t, na.rm = T))  
+hist(feld4_mittel.t, main = "Histogramm of field 4", ylab = "density", 
+     xlab = "", freq = F, prob = T, ylim = c(0,2.5))
+lines(density(feld4_mittel.t, na.rm = T))    
+dev.off()
+```
+
+
+# PCA and ICA
+PCA with method svdImpute, see Bachelor thesis
+```{r PCA}
+pc_mittel <- pca(gesamt_mittel.t, method = "svdImpute", nPcs = 8, center = F)
+# svdImpute calculated PCA
+# Importance of component(s):
+#               PC1    PC2     PC3     PC4     PC5     PC6     PC7     PC8
+# R2            0.2542 0.1113 0.09437 0.06942 0.05358 0.04078 0.03322 0.02981
+# Cumulative R2 0.2542 0.3654 0.45979 0.52920 0.58278 0.62356 0.65677 0.68659
+##117   Variables
+# 150 	Samples
+# 257 	NAs ( 1.464 %)
+# 8 	Calculated component(s)
+# Data was NOT mean centered before running PCA 
+# Data was NOT scaled before running PCA 
+# Scores structure:
+#   [1] 150   8
+# Loadings structure:
+#   [1] 117   8
+```
+
+## PCA feld3
+```{r PCA feld3}
+pcfeld3_mittel <- pca(feld3_mittel.t, method = "svdImpute", nPcs = 8, center = F)
+# svdImpute calculated PCA
+# Importance of component(s):
+#                  PC1    PC2    PC3     PC4     PC5     PC6     PC7     PC8
+# R2            0.1904 0.1281 0.1022 0.08714 0.05179 0.04832 0.04616 0.03614
+# Cumulative R2 0.1904 0.3185 0.4207 0.50782 0.55961 0.60793 0.65409 0.69024
+# 117   Variables
+# 75 	Samples
+# 148 	NAs ( 1.687 %)
+# 8 	Calculated component(s)
+# Data was NOT mean centered before running PCA 
+# Data was NOT scaled before running PCA 
+# Scores structure:
+#   [1] 75  8
+# Loadings structure:
+#   [1] 117   8
+```
+
+
+## PCA feld4
+```{r PCA feld4}
+pcfeld4_mittel <- pca(feld4_mittel.t, method = "svdImpute", nPcs = 8, center = F)
+# svdImpute calculated PCA
+# Importance of component(s):
+#               PC1    PC2     PC3     PC4     PC5     PC6     PC7     PC8
+# R2            0.2368 0.1775 0.09552 0.08155 0.04644 0.04037 0.03315 0.02957
+# Cumulative R2 0.2368 0.4143 0.50983 0.59137 0.63781 0.67818 0.71133 0.74090
+# 117   Variables
+# 75 	Samples
+# 109 	NAs ( 1.242 %)
+# 8 	Calculated component(s)
+# Data was NOT mean centered before running PCA 
+# Data was NOT scaled before running PCA 
+# Scores structure:
+#   [1] 75  8
+# Loadings structure:
+#   [1] 117   8
+
+```
+
+
+## PCA keine Mittelwerte
+```{r PCA keine Mittelwerte}
+pc_keineMittel <- pca(gesamt_keinmittel.t, method = "svdImpute", nPcs = 8, center = F)
+# svdImpute calculated PCA
+# Importance of component(s):
+#                 PC1    PC2     PC3     PC4     PC5     PC6    PC7     PC8
+# R2            0.2123 0.1228 0.09217 0.07026 0.06473 0.05577 0.0491 0.03423
+# Cumulative R2 0.2123 0.3351 0.42725 0.49750 0.56223 0.61800 0.6671 0.70133
+# 117   Variables
+# 306 	Samples
+# 2247 	NAs ( 6.276 %)
+# 8 	Calculated component(s)
+# Data was NOT mean centered before running PCA 
+# Data was NOT scaled before running PCA 
+# Scores structure:
+#   [1] 306   8
+# Loadings structure:
+#   [1] 117   8
+
+pdf("figures/gcms/pca_gesamtKeineMittel.pdf")
+x = pc_keineMittel@scores[,1]
+y = pc_keineMittel@scores[,2]
+plot(x, y, xlab = "PC1", ylab = "PC2", main = "Scores from PC1 and PC2 of the not averaged data", col = "white")
+points(x[ref_keinmittel$field=="3"], y[ref_keinmittel$field=="3"], pch=16, col = ref_keinmittel$batch[ref_keinmittel$field=="3"])
+points(x[ref_keinmittel$field=="4"], y[ref_keinmittel$field=="4"], pch=17, col = ref_keinmittel$batch[ref_keinmittel$field=="4"])
+legend("topright", legend = levels(ref_keinmittel$batch), 
+       text.col = seq_along(ref_keinmittel$batch))
+legend("bottomright", legend = c("field 3", "field 4"), pch = c(1,2))
+
+plot(pc_keineMittel@scores[,1], pc_keineMittel@scores[,2], col = ref_keinmittel$field, 
+     xlab = "PC1", ylab = "PC2", main = "Scores of the whole dataset", pch = 20)
+legend("bottomright", legend = c("field 3","field 4"), fill = c("green","blue"))
+
+plot(x, y, col = "white", 
+     xlab = "PC1", ylab = "PC2", 
+     main = "Scores of the whole dataset", pch = 20)
+
+text(x, y, labels = ref_keinmittel$name_short,
+     col = ref_keinmittel$field, cex = 0.7)
+
+legend("bottomleft", legend = c("field 3","field 4"), fill = c("green","blue"))
+
+dev.off()
+```
+
+
+# complete dataset (without means)
+```{r complete dataset (without means)}
+y_gesamt_keinmittel <- read.table("data/gcms/y_gesamtKeineMittel.txt", sep = "\t", header = T)
+dim(y_gesamt_keinmittel)
+# 306 accessions 117 metabolites
+y_gesamt_keinmittel[1:5,1:5]
+
+dim(gesamt_keinmittel.t)
+# 306 accessions 117 metabolites
+gesamt_keinmittel.t[1:5,1:5]
+
+# y_gesamt_keinmittel equals gesamt_keinmittel.t, but the latter one has rownames
+
+# reference table
+sam_ref_keinmittel <- read.table("data/gcms/sam_ref_gesamtKeineMittel.txt", header = T, sep = "\t")
+dim(sam_ref_keinmittel)
+# 306 accessions 5 refs (accession feld replicate batch sequence)
+class(sam_ref_keinmittel$batch)  #factor?
+levels(sam_ref_keinmittel$batch) #shows all available factors
+
+length(levels(sam_ref_keinmittel$accession))
+
+table(sam_ref_keinmittel$accession, sam_ref_keinmittel$field)
+```
+
+# ANOVA-Normalization: apply RemoveFactors function
+```{r ANOVA-normalization apply RemoveFactors function}
+# gesamt_keineMittel.norm <- apply(y_gesamt_keinmittel, 2, RemoveFactors, 
+#                                  sam = sam_ref_keinmittel, 
+#                                  facs = c("batch","sequence","feld"), 
+#                                  keep = c("feld","replicate","accession"))
+
+gesamt_keineMittel.norm <- apply(gesamt_keinmittel.t, 2, RemoveFactors, 
+                                 sam = sam_ref_keinmittel, 
+                                 facs = c("batch","sequence","field","accession"), 
+                                 keep = c("field","accession"))
+
+gesamt_keineMittel.norm[1:5,1:5]
+gesamt_keineMittel_anova <- gesamt_keineMittel.norm
+gesamt_keineMittel_anova[1:5,1:5]
+#rownames(gesamt_keineMittel_anova) <- rownames(gesamt_keinmittel.t) # add accesionnames
+
+write.table(gesamt_keineMittel_anova, file = "output/gcms/gesamt_keineMittel_anovanorm.txt", sep = "\t")
+dim(gesamt_keineMittel_anova)
+# 306 117
+```
+
+
+## PCA of anova-normalized values
+```{r PCA of anova-normalized values}
+pc_keineMittel.norm <- pca(gesamt_keineMittel_anova, method = "svdImpute", nPcs = 8, center = F)
+# svdImpute calculated PCA
+# Importance of component(s):
+#   PC1    PC2    PC3     PC4     PC5     PC6     PC7     PC8
+# R2            0.1356 0.1270 0.1022 0.07908 0.06001 0.04874 0.04464 0.03956
+# Cumulative R2 0.1356 0.2626 0.3649 0.44396 0.50397 0.55271 0.59735 0.63691
+# 117   Variables
+# 306 	Samples
+# 2247 	NAs ( 6.276 %)
+# 8 	Calculated component(s)
+# Data was NOT mean centered before running PCA 
+# Data was NOT scaled before running PCA 
+# Scores structure:
+#   [1] 306   8
+# Loadings structure:
+#   [1] 117   8
+```
+
+
+## PCA figure of anova-normalized values
+```{r PCA figure of anova-normalized values}
+pdf("figures/gcms/pca_gesamtKeineMittel_anova.pdf")
+x <- pc_keineMittel.norm@scores[,1]
+y <- pc_keineMittel.norm@scores[,2]
+plot(x, y, xlab = "PC1", ylab = "PC2", main = "Scores from PC1 and PC2 of the not averaged data, anova normalized", col = "white")
+points(x[ref_keinmittel$field=="3"], y[ref_keinmittel$field=="3"], pch = 16, col = ref_keinmittel$batch[ref_keinmittel$field=="3"])
+points(x[ref_keinmittel$field=="4"], y[ref_keinmittel$field=="4"], pch = 17, col = ref_keinmittel$batch[ref_keinmittel$field=="4"])
+legend("topright", legend = c("11006if","11026if","11039if","11044if","11035if","11012if","11020if"), 
+       text.col = seq_along(ref_keinmittel$batch), cex = 0.8)
+legend("bottomleft",legend = c("field 3","field 4"), pch = c(1,2))
+
+plot(x, y, col = "white", 
+     xlab = "PC1", ylab = "PC2", 
+     main = "Scores of the whole dataset", pch = 20)
+
+text(x, y, labels = ref_keinmittel$name_short,
+     col = ref_keinmittel$field, cex = 0.7)
+
+legend("bottomleft", legend = c("field 3","field 4"), fill = c("green","blue"))
+dev.off()
+```
+
+
+# Mean over Replicate from anova-normalized Data
+```{r Mean over Replicate from anova-normalized values}
+gesamt_mean_anova <- aggregate(gesamt_keineMittel_anova, 
+                               by = list(sam_ref_keinmittel$field, 
+                                         sam_ref_keinmittel$accession), 
+                               mean)
+
+colnames(gesamt_mean_anova)[c(1,2)] <- c("field", "accession")
+gesamt_mean_anova[1:5, 1:5]
+dim(gesamt_mean_anova)
+# 150 119 
+
+# remove the first two columns
+gesamt_mean_anova2 <- gesamt_mean_anova[,3:119]
+gesamt_mean_anova2[1:5, 1:5]
+dim(gesamt_mean_anova2)
+# 150 117
+
+interaction(gesamt_mean_anova$field, gesamt_mean_anova$accession)
+
+#rownames(gesamt_mean_anova2) <- colnames(gesamt_mittel)
+rownames(gesamt_mean_anova2) <- interaction(gesamt_mean_anova$field, gesamt_mean_anova$accession)
+gesamt_mean_anova2[1:5, 1:5]
+
+pc_gesamt_mean_anova <- pca(gesamt_mean_anova2, method = "svdImpute", nPcs = 8, center = F)
+
+pdf("figures/gcms/pca_gesamtMittel_anova.pdf")
+# plot(pc_gesamt_mean_anova@scores[,1],
+#      pc_gesamt_mean_anova@scores[,2],
+#      col = ref_gesamt_mittel$field, xlab = "PC1", ylab = "PC2", 
+#      main = "Scores of the whole dataset, replicates were averaged after anova-norm", pch = 20)
+# legend("bottomright", legend = c("field 3","field 4"), fill = c("green","blue"))
+
+color_vector <- rep("green",150)
+color_vector[gesamt_mean_anova$field=="field4"] <- "blue"
+
+plot(pc_gesamt_mean_anova@scores[,1],
+     pc_gesamt_mean_anova@scores[,2],
+     col = "white", xlab = "PC1", ylab = "PC2", pch = 20,
+     main = "Scores of the whole dataset, replicates were averaged after anova-norm")
+
+text(pc_gesamt_mean_anova@scores[,1],
+     pc_gesamt_mean_anova@scores[,2],
+     labels = gesamt_mean_anova$accession,
+     col = color_vector, cex = 0.7)
+
+legend("bottomleft", legend = c("field 3","field 4"), fill = c("green","blue"))
+dev.off()
+```

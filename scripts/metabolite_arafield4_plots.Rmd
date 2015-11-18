@@ -1,0 +1,313 @@
+---
+title: "Plots of metabolite data Arabidopsis field trial 4 (2009/10)"
+author: "Heike Sprenger"
+date: "Tuesday, May 07, 2015"
+output:
+  html_document:
+    highlight: tango
+    number_section: yes
+    theme: cerulean
+    toc: yes
+    toc_depth: 4
+---
+
+# Set working directory  
+```{r set working directory}
+#getwd()
+#setwd("D:/work/repos/ara_field_trials/")
+#setwd("~/work/repos/ara_field_trials/")
+```
+
+
+# Load workspace, packages and scripts
+```{r load workspace}
+# load packages
+library(knitr)
+library(pander)
+library(ggplot2)
+library(lattice)
+
+trellis.device() # zuruecksetzen auf default
+show.settings() # Farbeinstellungen usw. anzeigen
+
+# png default size: 480x480 pixel
+
+# set options for knitr
+opts_chunk$set(fig.width=10, fig.height=5)
+opts_knit$set(root.dir = '../')
+
+# load workspace
+#load("metabolite_arafield4.RData")
+```
+
+
+# Source functions
+```{r source functions}
+source("../libpurzel/func_bw_plot.R")
+source("../libpurzel/func_boxplot.R")
+source("../libpurzel/func_cv.R")
+```
+
+
+# Load data
+Use changed metabolite data, from ``metabolite_arafield4_overview4.Rmd``
+```{r load data}
+metabolite_arafield4 <- read.table("output/metabolite_arafield4.txt", header=TRUE, sep="\t")
+
+lt50 <- read.table("data/LT50.txt", header=TRUE, sep="\t")
+pander(head(lt50))
+
+yCapacity4full <- metabolite_arafield4$LT50ACC - metabolite_arafield4$LT50NAC 
+yCapacity4 <- lt50$LT50.ACC - lt50$LT50.NAC
+```
+
+
+# Boxplots (from lattice package)
+## Boxplot of metabolites and LT50 for all samples
+```{r boxplots from lattice package}
+pdf("figures/Metabolite_AraField4_bwplots.pdf")   
+
+func_bw_plot(metabolite_arafield4$glucoseT, title = "Glucose")
+func_bw_plot(metabolite_arafield4$fructoseT, title = "Fructose")
+func_bw_plot(metabolite_arafield4$sucroseT, title = "Sucrose")
+func_bw_plot(metabolite_arafield4$raffinoseT, title = "Raffinose")
+func_bw_plot(metabolite_arafield4$amino_acidsT, title = "Amino acids")
+func_bw_plot(metabolite_arafield4$malate_positive, title = "Malate")
+func_bw_plot(metabolite_arafield4$fumarateT, title = "Fumarate")
+func_bw_plot(metabolite_arafield4$prolineT, title = "Proline")
+func_bw_plot(metabolite_arafield4$anthocyaninT, title = "Anthocyanins", 
+             xlab_text = expression("absolute Absorption A"[530]*"/g FG"))
+func_bw_plot(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants", 
+             xlab_text = expression("LT"[50]*"NAC in °C"))
+func_bw_plot(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants", 
+             xlab_text = expression("LT"[50]*"ACC in °C"))
+func_bw_plot(yCapacity4, title = "Acclimation capacity", 
+             xlab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+
+dev.off()
+```
+
+
+## Boxplots of metabolites and LT50 per BBCH category
+```{r boxplots of metabolites and LT50 per BBCH category}
+pdf("figures/Metabolite_AraField4_bwplots_per_bbch.pdf")   
+cat1_value <- metabolite_arafield4$bbch_categories_en
+
+func_bw_plot_cat1(metabolite_arafield4$glucoseT, title = "Glucose")
+func_bw_plot_cat1(metabolite_arafield4$fructoseT, title = "Fructose")
+func_bw_plot_cat1(metabolite_arafield4$sucroseT, title = "Sucrose")
+func_bw_plot_cat1(metabolite_arafield4$raffinoseT, title = "Raffinose")
+func_bw_plot_cat1(metabolite_arafield4$amino_acidsT, title = "Amino acids")
+func_bw_plot_cat1(metabolite_arafield4$malate_positive, title = "Malate")
+func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
+func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
+func_bw_plot_cat1(metabolite_arafield4$anthocyaninT, title = "Anthocyanins",
+                  ylab_text = expression("absolute Absorption A"[530]*"/g FG"))
+func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
+                  ylab_text = expression("LT"[50]*"NAC in °C"))
+func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
+                  xlab_text = expression("LT"[50]*"ACC in °C"))
+func_bw_plot_cat1(yCapacity4, title = "Acclimation capacity", 
+                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+dev.off()
+```
+
+
+## Boxplots of metabolites and LT50 per flowering state
+**here: is equal to BBCH category because there are no plants in vegetative stage**
+```{r boxplots of metabolites and LT50 per flowering state}
+pdf("figures/Metabolite_AraField4_bwplots_per_flowering_state.pdf")  
+
+trellis.par.set(box.dot = new.dot, 
+                box.rectangle = new.rectangle, 
+                box.umbrella = new.umbrella, 
+                plot.symbol = new.symbol, 
+                strip.background = new.strip.background, 
+                strip.shingle = new.strip.shingle,
+                axis.text = new.axis.text, 
+                par.main.text = new.par.main.text, 
+                par.xlab.text = new.par.xlab.text, 
+                par.ylab.text = new.par.ylab.text, 
+                par.strip.text = new.par.strip.text)
+
+cat1_value <- metabolite_arafield4$flowering_state
+
+func_bw_plot_cat1(metabolite_arafield4$glucoseT, title = "Glucose")
+func_bw_plot_cat1(metabolite_arafield4$fructoseT, title = "Fructose")
+func_bw_plot_cat1(metabolite_arafield4$sucroseT, title = "Sucrose")
+func_bw_plot_cat1(metabolite_arafield4$raffinoseT, title = "Raffinose")
+func_bw_plot_cat1(metabolite_arafield4$amino_acidsT, title = "Amino acids")
+func_bw_plot_cat1(metabolite_arafield4$malate_positive, title = "Malate")
+func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
+func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
+func_bw_plot_cat1(metabolite_arafield4$anthocyaninT, title = "Anthocyanins",
+                  ylab_text = expression("absolute Absorption A"[530]*"/g FG"))
+func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
+                  ylab_text = expression("LT"[50]*"NAC in °C"))
+func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
+                  xlab_text = expression("LT"[50]*"ACC in °C"))
+func_bw_plot_cat1(yCapacity4, title = "Acclimation capacity", 
+                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+
+dev.off()
+```
+
+
+## Boxplots of metabolites and LT50 per vegetative state
+**doesn't make sense here: there are no plants in vegetative stage!**
+```{r boxplots of metabolites and LT50 per vegetative state}
+# pdf("figures/Metabolite_AraField4_bwplots_per_vegetative_state.pdf")  
+# cat1_value <- metabolite_arafield4$vegetative_state
+# 
+# func_bw_plot_cat1(metabolite_arafield4$glucoseT, title = "Glucose")
+# func_bw_plot_cat1(metabolite_arafield4$fructoseT, title = "Fructose")
+# func_bw_plot_cat1(metabolite_arafield4$sucroseT, title = "Sucrose")
+# func_bw_plot_cat1(metabolite_arafield4$raffinoseT, title = "Raffinose")
+# func_bw_plot_cat1(metabolite_arafield4$amino_acidsT, title = "Amino acids")
+# func_bw_plot_cat1(metabolite_arafield4$malate_positive, title = "Malate")
+# func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
+# func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
+# func_bw_plot_cat1(metabolite_arafield4$anthocyaninT, title = "Anthocyanins",
+#                   ylab_text = expression("absolute Absorption A"[530]*"/g FG"))
+# func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
+#                   ylab_text = expression("LT"[50]*"NAC in °C"))
+# func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
+#                   xlab_text = expression("LT"[50]*"ACC in °C"))
+# func_bw_plot_cat1(yCapacity4, title = "Acclimation capacity", 
+#                   ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+
+# dev.off()
+```
+
+
+## Boxplots of metabolites and LT50 per anthocyanin score
+```{r boxplots of metabolites and LT50 per anthocyanin score}
+pdf("figures/Metabolite_AraField4_bwplots_per_anthocyanin_score.pdf")  
+cat1_value <- metabolite_arafield4$antho_value_en
+
+func_bw_plot_cat1(metabolite_arafield4$glucoseT, title = "Glucose")
+func_bw_plot_cat1(metabolite_arafield4$fructoseT, title = "Fructose")
+func_bw_plot_cat1(metabolite_arafield4$sucroseT, title = "Sucrose")
+func_bw_plot_cat1(metabolite_arafield4$raffinoseT, title = "Raffinose")
+func_bw_plot_cat1(metabolite_arafield4$amino_acidsT, title = "Amino acids")
+func_bw_plot_cat1(metabolite_arafield4$malate_positive, title = "Malate")
+func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
+func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
+func_bw_plot_cat1(metabolite_arafield4$anthocyaninT, title = "Anthocyanins",
+                  ylab_text = expression("absolute Absorption A"[530]*"/g FG"))
+func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
+                  ylab_text = expression("LT"[50]*"NAC in °C"))
+func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
+                  xlab_text = expression("LT"[50]*"ACC in °C"))
+func_bw_plot_cat1(yCapacity4, title = "Acclimation capacity", 
+                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+
+dev.off()
+```
+
+
+## Boxplots of metabolites and LT50 per BBCH categories and anthocyanin score
+**Attention: Chunck is not evaluated because it resulted in error messages during knitting HTML document, but not during normal code running!**
+```{r boxplots of metabolites and LT50 per BBCH categories and anthocyanin score, eval=FALSE}
+pdf("figures/Metabolite_AraField4_bwplots_per_bbch_and_anthocyanin_score.pdf")  
+cat1_value <- metabolite_arafield4$antho_value_en
+cat2_value <- metabolite_arafield4$bbch_categories_en
+
+func_bw_plot_cat2(metabolite_arafield4$glucoseT, title = "Glucose")
+func_bw_plot_cat2(metabolite_arafield4$fructoseT, title = "Fructose")
+func_bw_plot_cat2(metabolite_arafield4$sucroseT, title = "Sucrose")
+func_bw_plot_cat2(metabolite_arafield4$raffinoseT, title = "Raffinose")
+func_bw_plot_cat2(metabolite_arafield4$amino_acidsT, title = "Amino acids")
+func_bw_plot_cat2(metabolite_arafield4$malate_positive, title = "Malate")
+func_bw_plot_cat2(metabolite_arafield4$fumarateT, title = "Fumarate")
+func_bw_plot_cat2(metabolite_arafield4$prolineT, title = "Proline")
+func_bw_plot_cat2(metabolite_arafield4$anthocyaninT, title = "Anthocyanins",
+                  ylab_text = expression("absolute Absorption A"[530]*"/g FG"))
+func_bw_plot_cat2(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
+                  ylab_text = expression("LT"[50]*"NAC in °C"))
+func_bw_plot_cat2(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
+                  xlab_text = expression("LT"[50]*"ACC in °C"))
+func_bw_plot_cat2(yCapacity4, title = "Acclimation capacity", 
+                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+
+dev.off()
+```
+
+# Boxplots (from graphics package)
+## Boxplots to get overview of measurements
+```{r boxplots from graphics package}
+pdf("figures/Metabolite_AraField4_Boxplots.pdf")
+par(mar=c(5.1, 5.1, 4.1, 2.1))
+
+func_boxplot_simple(metabolite_arafield4$glucoseT, title = "Glucose")
+func_boxplot_simple(metabolite_arafield4$fructoseT, title = "Fructose")
+func_boxplot_simple(metabolite_arafield4$sucroseT, title = "Sucrose")
+func_boxplot_simple(metabolite_arafield4$raffinoseT, title = "Raffinose")
+func_boxplot_simple(metabolite_arafield4$amino_acidsT, title = "Amino acids")
+func_boxplot_simple(metabolite_arafield4$malate_positive, title = "Malate")
+func_boxplot_simple(metabolite_arafield4$fumarateT, title = "Fumarate")
+func_boxplot_simple(metabolite_arafield4$prolineT, title = "Proline")
+func_boxplot_simple(metabolite_arafield4$anthocyaninT, title = "Anthocyanins", 
+             ylab_text = expression("absolute Absorption A"[530]*"/g FG"))
+func_boxplot_simple(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants", 
+             ylab_text = expression("LT"[50]*"NAC in °C"))
+func_boxplot_simple(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants", 
+             ylab_text = expression("LT"[50]*"ACC in °C"))
+func_boxplot_simple(yCapacity4, title = "Acclimation capacity", 
+             ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+
+dev.off()
+```
+
+
+# Boxplots to get overview of coefficient of variation (CV)
+```{r boxplots to get overview of coefficient of variation}
+# calculate CV per metabolite and accession
+metabolite_arafield4.x <- subset(metabolite_arafield4, 
+                                 select= c(accession, glucose_positive, fructose_positive, sucrose_positive, 
+                                           raffinose_positive, amino_acids_positive, malate_positive, 
+                                           fumarate_positive, proline_positive, anthocyanin_positive))
+head(metabolite_arafield4.x)
+metabolite_arafield4_CV <- aggregate(. ~ accession, metabolite_arafield4.x, func_CV)
+head(metabolite_arafield4_CV)
+
+ylab_text_cv <- "Coefficient of variation (CV)"
+
+pdf("figures/Metabolite_AraField4_CV_Boxplots.pdf")
+par(mar=c(9, 5, 4, 2))
+# all metabolites
+boxplot(metabolite_arafield4_CV[,-1], main = "all metabolites", ylab = ylab_text_cv, las=2)
+# single metabolites
+par(mar=c(5, 5, 4, 2))
+func_boxplot_simple(metabolite_arafield4_CV$glucose_positive, title = "Glucose", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$fructose_positive, title = "Fructose", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$sucrose_positive, title = "Sucrose", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$raffinose_positive, title = "Raffinose", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$amino_acids_positive, title = "Amino acids", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$malate_positive, title = "Malate", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$fumarate_positive, title = "Fumarate", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$proline_positive, title = "Proline", ylab_text = ylab_text_cv)
+func_boxplot_simple(metabolite_arafield4_CV$anthocyanin_positive, title = "Anthocyanins", ylab_text = ylab_text_cv)
+dev.off()
+```
+
+
+# Pairs plot
+```{r pairs plot}
+pdf("figures/Metabolite_AraField4_Pairs.pdf", width=15, height=15)
+pairs(metabolite_arafield4[,c(16:17,21,24,31:39)], 
+      panel = panel.smooth, labels = c(expression("LT"[50]*"NAC"), 
+                                       expression("LT"[50]*"ACC"),"BBCH",
+                                       "Antho- \n Score","Glc","Frc","Suc",
+                                       "Raf","AA","Mal","Fum","Pro","Antho- \n cyane"), 
+      cex.labels = 2, font.labels = 2, cex.main = 2, cex.axis = 1.5, 
+      main = "complete dataset field trial 4", gap = 0.1)
+dev.off()
+```
+
+
+# Save workspace
+```{r save workspace}
+save.image("metabolite_arafield4.RData")
+```
+

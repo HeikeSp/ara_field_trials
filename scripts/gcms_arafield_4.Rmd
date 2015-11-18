@@ -1,0 +1,652 @@
+---
+title: "GC-MS data of Arabidopsis field trial 4 (2009/10)"
+author: "Heike Sprenger"
+date: "Tuesday, September 29, 2015"
+output:
+  html_document:
+    highlight: tango
+    number_section: yes
+    theme: cerulean
+    toc: yes
+    toc_depth: 4
+---
+
+# Set working directory  
+```{r set working directory}
+#getwd()
+#setwd("D:/work/repos/ara_field_trials/")
+#setwd("~/work/repos/ara_field_trials/")
+```
+
+# Load workspace, packages and scripts
+```{r load workspace, message=FALSE}
+# load packages
+library(knitr)
+library(pander)
+library(ggplot2)
+library(pcaMethods)
+library(plotrix)
+library(moments)
+library(fastICA)
+library(pls)
+library(cwhmisc)
+library(gplots)
+library(plyr)
+library(RColorBrewer)
+
+# set options for knitr
+opts_chunk$set(fig.width=10, fig.height=5, tidy = TRUE)
+opts_knit$set(root.dir = '../')
+
+# load workspace
+#load("gcms_arafield_4.RData")
+```
+
+
+```{r source R scripts, include=FALSE}
+source("../libpurzel/colors.R")
+
+source("../libpurzel/RemoveFactors_function.R")
+source("../libpurzel/func_normalize.R")
+source("../libpurzel/func_log_transform.R")
+
+source("../libpurzel/func_check_norm_dist.R")
+source("../libpurzel/find_one_outlier.R")
+source("../libpurzel/func_hist_outlier.R")
+source("../libpurzel/func_replace_outlier.R")
+
+source("../libpurzel/func_pca_plots.R")
+```
+
+
+# Preprocessing in Excel
+* normalized to 13C6-Sorbitol and FW [max-normalized (%)] by Alex
+* max-normalized means from 0 to 100% per analyte 
+* to make splitless und split30 values comparable, kind of scaling
+* mean over replicates
+* only "best quantitative information" selected
+* siloxane, alkane, all standards and contaminations were removed
+* metabolites with more than 15% NAs and/or with more than 50% under blank average were removed
+* accession Wassilewskija (Ws-0) was removed because it was missing in one field
+* accession Blh-1 was removed, because of the amount of overfitted metabolites
+* transformation log(10) ratio median (without Blanks and Multimix)); over all data and each field SEPARATELY!
+* 306 individual samples (from 2 years, 75 accessions)
+* 117 selected metabolites
+
+# Load samplelist
+```{r load samplelist}
+samplelist <- read.table("data/gcms/11004if hincha-field-ara-cold-270_profile_combined_samplelist.txt", 
+                         row.names = 1, na.strings = "NA", sep = "\t", header=T) 
+dim(samplelist)
+# 348 samples
+
+table(samplelist$Field)
+
+# select only biological samples from field4
+samplelist_biological_samples <- droplevels( subset(samplelist, Select == "yes" & Field == "field4"))
+dim(samplelist_biological_samples)
+# 156 samples
+
+# look at batches from split and splitless measurement
+table(samplelist_biological_samples$Batch_split30, 
+      samplelist_biological_samples$Batch_splitless)
+```
+
+
+# Load accession metadata
+```{r load accession metadata}
+accessions_metadata <- read.table("data/gcms/accessions_metadata.txt",
+                                  na.strings = "NA", sep = "\t", header = T)
+
+colnames(accessions_metadata)[3] <- "Accession"
+
+# compare accession names
+intersect(accessions_metadata$Accession, levels(samplelist_biological_samples$Accession))
+# complete overlap
+
+samplelist_joined <- join(samplelist_biological_samples, accessions_metadata, by = "Accession")
+```
+
+
+# Load metabolite information
+```{r load metabolite information}
+metabolites_selected <- read.table("data/gcms/metabolites_selected.txt", 
+                        na.strings = "NA", sep = "\t", header=T)
+
+dim(metabolites_selected)
+# 125 metabolites
+```
+
+
+# Load data including blanks, multimix and biological samples
+**Data are not yet transformed, just normalized to sorbitol and FW**
+```{r load data including blanks, multimix and biological samples}
+norm_biological_samples_selected_all <- read.table("output/gcms/norm_biological_samples_selected.txt", 
+                                               row.names = 1, na.strings = "NA", sep = "\t", header=T, check.names = F)
+dim(norm_biological_samples_selected_all)
+# 125 metabolites, 306 samples
+
+# select samples belonging to field4
+norm_biological_samples_selected <- norm_biological_samples_selected_all [, 151:306]
+dim(norm_biological_samples_selected)
+# 125 metabolites, 156 samples
+```
+
+
+## Heatmap of all normalized samples before transformation
+```{r heatmap of all normalized samples before transformation}
+norm_biological_samples_selected_mat <- as.matrix(norm_biological_samples_selected)
+
+range(norm_biological_samples_selected_mat, na.rm=T)
+my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 299)
+col_breaks <- c(seq(0,10,length=100),seq(11,30,length=100),seq(31,100,length=100))
+
+pdf("figures/gcms/heatmap_biological_samples_field4.pdf", width = 20, height = 12)
+heatmap.2(norm_biological_samples_selected_mat, 
+          na.rm = T, key = T,
+          scale = "none", trace = "none", 
+          col = my_palette, breaks = col_breaks, 
+          na.color = "grey",
+          cexRow = 0.4, cexCol = 0.4)
+dev.off()
+```
+
+
+# PCA before transformation
+## PCA of normalized data before transformation: biological samples
+```{r PCA of normalized data before transformation: biological samples}
+norm_biological_samples_selected_t <- t(norm_biological_samples_selected) 
+dim(norm_biological_samples_selected_t)
+# 156 samples, 125 metabolites
+
+pca_pareto_center_norm_biological_samples_selected <- pca(norm_biological_samples_selected_t, method = "svdImpute", nPcs = 5, center = T, scale = "pareto")
+
+pca_pareto_center_norm_biological_samples_selected@R2
+
+biplot(pca_pareto_center_norm_biological_samples_selected)
+```
+
+
+## PCA plot of normalized biological samples
+```{r PCA plot of normalized biological samples}
+pdf("figures/gcms/pca_norm_biological_samples_field4.pdf")
+
+x = pca_pareto_center_norm_biological_samples_selected@scores[,1]
+y = pca_pareto_center_norm_biological_samples_selected@scores[,2]
+
+palette(heike_palette_7)
+plot(x, y, xlab = "PC1", ylab = "PC2", main = "normalized data, pareto scaling, centering", 
+     col = samplelist_biological_samples$Batch_split30, pch = 19)
+legend("topleft", legend = levels(samplelist_biological_samples$Batch_split30), fill = heike_palette_7, cex = 0.7)
+
+plot(x, y, xlab = "PC1", ylab = "PC2", main = "normalized data, pareto scaling, centering", col = "white", pch = 19)
+text(x, y, labels = samplelist_biological_samples$Accession, col = "black", cex = 0.7)
+
+palette(heike_palette_7)
+pairs(pca_pareto_center_norm_biological_samples_selected@scores, col = samplelist_biological_samples$Batch_split30, pch = 19)
+dev.off()
+```
+
+
+# Transformation: calculation of log-median-ratio
+**Divide normalized value by calculate median, then take log10 of this ratio**
+**Median is calculated over ALL biological samples of one metabolite (Field 3 and 4 are considered together)**
+```{r transformation: calculation of log-median-ratio}
+transform_norm_biological_samples_selected <- func_log_transform(norm_biological_samples_selected)
+dim(transform_norm_biological_samples_selected)
+# 125 156
+```
+
+
+## Heatmap after transformation
+```{r heatmap after transformation}
+transform_norm_biological_samples_selected_mat <- as.matrix(transform_norm_biological_samples_selected)
+
+range(transform_norm_biological_samples_selected_mat, na.rm=T)
+my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 299)
+col_breaks <- c(seq(-1, -0.21, length=100), seq(-0.2, 0.2, length=100), seq(0.21, 2, length=100))
+
+pdf("figures/gcms/heatmap_biological_samples_transformed_field4.pdf", width = 20, height = 12)
+heatmap.2(transform_norm_biological_samples_selected_mat, 
+          na.rm = T, key = T,
+          scale = "none", trace = "none", 
+          col = my_palette, breaks = col_breaks, 
+          na.color = "grey",
+          cexRow = 0.6, cexCol = 0.6)
+dev.off()
+```
+
+
+# PCA after transformation
+## PCA of transformed data: biological samples
+```{r PCA of transformed data: biological samples}
+transform_norm_biological_samples_selected_t <- t(transform_norm_biological_samples_selected) 
+dim(transform_norm_biological_samples_selected_t)
+# 156 samples, 136 metabolites
+
+pca_pareto_center_transform_norm_biological_samples_selected <- pca(transform_norm_biological_samples_selected_t, 
+                                                                    method = "svdImpute", nPcs = 5, center = T, scale = "pareto")
+
+pca_pareto_center_transform_norm_biological_samples_selected@R2
+biplot(pca_pareto_center_transform_norm_biological_samples_selected)
+```
+
+
+## PCA plot of transformed biological samples
+```{r PCA plot of transformed biological samples}
+pdf("figures/gcms/pca_transform_norm_biological_samples_field4.pdf")
+
+x = pca_pareto_center_transform_norm_biological_samples_selected@scores[,1]
+y = pca_pareto_center_transform_norm_biological_samples_selected@scores[,2]
+
+palette(heike_palette_7)
+plot(x, y, xlab = "PC1 (18.9%)", ylab = "PC2 (16.1%)", main = "normalized and transformed data, pareto scaling, centering", 
+     col = samplelist_biological_samples$Batch_split30, pch = 19)
+legend("topright", legend = levels(samplelist_biological_samples$Batch_split30), fill = heike_palette_7, cex = 0.7)
+
+plot(x, y, xlab = "PC1 (18.9%)", ylab = "PC2 (16.1%)", main = "normalized and transformed data, pareto scaling, centering", col = "white", pch=19)
+text(x, y, labels = samplelist_biological_samples$Accession, col = "black", cex = 0.7)
+
+pairs(pca_pareto_center_transform_norm_biological_samples_selected@scores, col = samplelist_biological_samples$Batch_split30, pch=19, main = "pareto scaling, centering")
+legend(0, 1, legend = levels(samplelist_biological_samples$Batch_split30), fill = heike_palette_7, cex = 0.7 , horiz = T)
+
+dev.off()
+```
+
+
+# ANOVA normalization
+## generate factors table
+```{r generate factors table}
+factors <- data.frame("GMO_ID" = samplelist_biological_samples$GMO_ID, 
+                      "Accession" = samplelist_biological_samples$Accession,
+                      "Batch" = samplelist_biological_samples$Batch_split30,
+                      "Sequence" = samplelist_biological_samples$Sequence_split30)
+head(factors)
+```
+
+
+## ANOVA normalization: use transformed data (log-median-ratio-transformation)
+```{r ANOVA normalization: use transformed data}
+# samples must be in rows, analytes in columns
+transform_norm_biological_samples_selected_t[1:3, 1:3]
+
+range(transform_norm_biological_samples_selected_t, na.rm=T)
+hist(transform_norm_biological_samples_selected_t, breaks=30)
+
+anova_transform_norm_biological_samples_selected_t <- func_normalize(transform_norm_biological_samples_selected_t, 
+                                                           factors,
+                                                           facs=c("Accession", "Sequence", "Batch"),
+                                                           keep=c("Accession"))
+
+dim(anova_transform_norm_biological_samples_selected_t)
+# 156 samples, 125 metabolites 
+range(anova_transform_norm_biological_samples_selected_t, na.rm=T)
+hist(anova_transform_norm_biological_samples_selected_t, breaks=30)
+
+# plot all values before and after ANOVA-normalization
+plot(anova_transform_norm_biological_samples_selected_t, transform_norm_biological_samples_selected_t, col = samplelist_biological_samples$Batch_split30)
+```
+
+
+# PCA of ANOVA-normalized data
+## PCA of ANOVA-normalized data after transformation: biological samples
+```{r PCA of ANOVA-normalized data after transformation: biological samples}
+dim(anova_transform_norm_biological_samples_selected_t)
+# 156 samples, 125 metabolites
+
+pca_pareto_center_anova_transform_norm_biological_samples_selected <- pca(anova_transform_norm_biological_samples_selected_t, 
+                                                          method = "svdImpute", nPcs = 5, center = T, scale = "pareto")
+
+pca_pareto_center_anova_transform_norm_biological_samples_selected@R2
+
+biplot(pca_pareto_center_anova_transform_norm_biological_samples_selected)
+```
+
+
+## PCA plot of ANOVA-normalized data biological samples
+```{r PCA plot of ANOVA-normalized data biological samples}
+pdf("figures/gcms/pca_anova_transform_norm_biological_samples_field4.pdf")
+
+x = pca_pareto_center_anova_transform_norm_biological_samples_selected@scores[,1]
+y = pca_pareto_center_anova_transform_norm_biological_samples_selected@scores[,2]
+z = pca_pareto_center_anova_transform_norm_biological_samples_selected@scores[,4]
+
+palette(heike_palette_7)
+plot(x, y, xlab = "PC1 (17.7%)", ylab = "PC2 (15.2%)", main = "normalized, transformed and ANOVA-normalized data, pareto scaling, centering", 
+     col = samplelist_biological_samples$Batch_split30, pch=19)
+legend("topright", legend = levels(samplelist_biological_samples$Batch_split30), fill = heike_palette_7, cex = 0.7)
+
+plot(x, y, xlab = "PC1 (17.7%)", ylab = "PC2 (15.2%)", main = "normalized, transformed and ANOVA-normalized data, pareto scaling, centering", col = "white", pch=19)
+text(x, y, labels = samplelist_biological_samples$Accession, col = "black", cex = 0.7)
+
+pairs(pca_pareto_center_anova_transform_norm_biological_samples_selected@scores, col = samplelist_biological_samples$Batch_split30, pch=19, main = "pareto scaling, centering")
+legend(0, 1, legend = levels(samplelist_biological_samples$Batch_split30), fill = heike_palette_7, cex = 0.7 , horiz = T)
+
+
+# frost tolerance
+rbPal <- colorRampPalette(c('blue','red'))
+samplelist_joined$LT50_ACC_col <- rbPal(10)[as.numeric(cut(samplelist_joined$LT50_ACC, breaks = 10))]
+samplelist_joined$LT50_ACC_col[is.na(samplelist_joined$LT50_ACC_col)] <- "grey"
+
+plot(x, y, xlab = "PC1", ylab = "PC2", 
+     main = "normalized, transformed and ANOVA-normalized data, pareto scaling, centering", 
+     col = samplelist_joined$LT50_ACC_col, pch=19)
+text(x, y, labels = samplelist_joined$Accession, pos = 1,
+     col = "black", cex = 0.7)
+
+plot(x, z, xlab = "PC2", ylab = "PC4", 
+     main = "normalized, transformed and ANOVA-normalized data, pareto scaling, centering", 
+     col = samplelist_joined$LT50_ACC_col, pch=19, cex=1.5)
+text(x, z, labels = samplelist_joined$Accession, col = "black", cex = 0.7)
+
+pairs(pca_pareto_center_anova_transform_norm_biological_samples_selected@scores, 
+      col = samplelist_joined$LT50_ACC_col, 
+      pch=19, main = "no scaling, no centering")
+
+
+dev.off()
+```
+
+
+## Heatmap after transformation AND ANOVA-tranformation
+```{r heatmap after transformation AND ANOVA-tranformation}
+anova_transform_norm_biological_samples_selected_mat <- as.matrix(t(anova_transform_norm_biological_samples_selected_t))
+
+range(anova_transform_norm_biological_samples_selected_mat, na.rm=T)
+my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 299)
+col_breaks <- c(seq(-1, -0.21, length=100), seq(-0.2, 0.2, length=100), seq(0.21, 2, length=100))
+
+pdf("figures/gcms/heatmap_biological_samples_anova_transformed_field4.pdf", width = 20, height = 12)
+heatmap.2(anova_transform_norm_biological_samples_selected_mat, 
+          na.rm = T, key = T,
+          scale = "none", trace = "none", 
+          col = my_palette, breaks = col_breaks, 
+          na.color = "grey",
+          cexRow = 0.6, cexCol = 0.6)
+dev.off()
+```
+
+
+## Barplot of ANOVA-normalized data biological samples
+```{r barplot of ANOVA-normalized data biological samples}
+table(samplelist_biological_samples$Accession, samplelist_biological_samples$Batch_split30)
+
+pdf("figures/gcms/barplot_norm_field4.pdf", width=20, height=7)
+for (i in 1:nrow(norm_biological_samples_selected)){
+  barplot(as.numeric(norm_biological_samples_selected[i, 1:156]), 
+          col = samplelist_biological_samples$Batch_split30, las=2,
+          ylab = "ANOVA-normalized value after log-median transformation",
+          names.arg = samplelist_biological_samples$Accession)
+ 
+  mtext(metabolites_selected$Name_Changed[i], side = 3, line = 2, cex = 1.3)
+  }
+dev.off()
+
+pdf("figures/gcms/barplot_transform_norm_field4.pdf", width=20, height=7)
+for (i in 1:nrow(transform_norm_biological_samples_selected)){
+  barplot(as.numeric(transform_norm_biological_samples_selected[i, 1:156]), 
+          col = samplelist_biological_samples$Batch_split30, las=2,
+          ylab = "ANOVA-normalized value after log-median transformation",
+          names.arg = samplelist_biological_samples$Accession)
+  
+  mtext(metabolites_selected$Name_Changed[i], side = 3, line = 2, cex = 1.3)
+  }
+dev.off()
+
+
+pdf("figures/gcms/barplot_anova_transform_norm_field4.pdf", width=20, height=7)
+for (i in 1:nrow(anova_transform_norm_biological_samples_selected_mat)){
+  barplot(as.numeric(anova_transform_norm_biological_samples_selected_mat[i, 1:156]), 
+          col = samplelist_biological_samples$Batch_split30, las=2,
+          ylab = "ANOVA-normalized value after log-median transformation",
+          names.arg = samplelist_biological_samples$Accession)
+  
+  mtext(metabolites_selected$Name_Changed[i], side = 3, line = 2, cex = 1.3)
+  }
+dev.off()
+```
+
+
+# Calculate mean over replicates
+```{r calculate mean over replicates, fig.width=6, fig.height=6}
+anova_transform_norm_biological_samples_selected_t[1:3, 1:3]
+sum(is.na(anova_transform_norm_biological_samples_selected_t))
+# 658
+# 3.4%
+
+mean_anova_transform_norm_biological_samples_selected <- aggregate(anova_transform_norm_biological_samples_selected_t, 
+                                                                   by = list(samplelist_biological_samples$Accession), 
+                                                                   mean)
+
+colnames(mean_anova_transform_norm_biological_samples_selected)[1] <- c("Accession")
+mean_anova_transform_norm_biological_samples_selected[1:5, 1:5]
+dim(mean_anova_transform_norm_biological_samples_selected)
+# 75 126
+sum(is.na(mean_anova_transform_norm_biological_samples_selected))
+# 567
+# 6.0%
+
+samplelist_joined_mean <- join(mean_anova_transform_norm_biological_samples_selected[,c(1,2)], accessions_metadata, by = "Accession")
+samplelist_joined_mean <- samplelist_joined_mean[,-2]
+
+apply(mean_anova_transform_norm_biological_samples_selected[, -1], 2, function(x) sum(is.na(x)) )
+
+# compare percentage of NAs before and after mean calculation 
+# some metabolites have too many NAs after mean calculation!
+plot(apply(anova_transform_norm_biological_samples_selected_t, 2, function(x) sum(is.na(x)) )/150*100,
+     apply(mean_anova_transform_norm_biological_samples_selected[,-1], 2, function(x) sum(is.na(x)) )/75*100, 
+     pch=19, xlim=c(0,60), ylim=c(0,60), xlab="percentage NA BEFORE mean calculation", ylab="percentage NA AFTER mean calculation")
+abline(0,1)
+grid(10,10)
+```
+
+
+## Heatmap after mean calculation
+```{r heatmap after mean calculation}
+mean_anova_transform_norm_biological_samples_selected_mat <- as.matrix(t(mean_anova_transform_norm_biological_samples_selected[,-1]))
+colnames(mean_anova_transform_norm_biological_samples_selected_mat) <- mean_anova_transform_norm_biological_samples_selected$Accession
+
+# save mean table
+write.table(mean_anova_transform_norm_biological_samples_selected_mat, 
+            "output/gcms/mean_anova_transform_norm_biological_samples_selected_field4.txt", sep="\t")
+
+range(mean_anova_transform_norm_biological_samples_selected_mat, na.rm=T)
+my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 299)
+col_breaks <- c(seq(-1, -0.21, length=100), seq(-0.2, 0.2, length=100), seq(0.21, 2, length=100))
+
+pdf("figures/gcms/heatmap_biological_samples_mean_anova_transformed_field4.pdf", width = 20, height = 12)
+heatmap.2(mean_anova_transform_norm_biological_samples_selected_mat, 
+          na.rm = T, key = T,
+          scale = "none", trace = "none", 
+          col = my_palette, breaks = col_breaks, 
+          na.color = "grey",
+          cexRow = 0.6, cexCol = 1)
+dev.off()
+```
+
+
+# PCA of mean data
+## PCA of mean data (ANOVA-normalized data after transformation)
+```{r PCA of mean data}
+dim(mean_anova_transform_norm_biological_samples_selected[,-1]) # remove first column!
+# 75 samples, 125 metabolites
+
+pca_pareto_center_mean_anova_transform_norm_biological_samples_selected <- pca(mean_anova_transform_norm_biological_samples_selected[,-1], 
+                                                          method = "svdImpute", nPcs = 5, center = T, scale = "pareto")
+
+pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@R2
+
+biplot(pca_pareto_center_mean_anova_transform_norm_biological_samples_selected)
+```
+
+
+## PCA scores plot of mean data (ANOVA-normalized data after transformation)
+```{r PCA scores plot of mean data}
+pdf("figures/gcms/pca_mean_anova_transform_norm_biological_samples_field4.pdf")
+
+x = pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@scores[,1]
+y = pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@scores[,2]
+
+plot(x, y, xlab = "PC1 (20.0%)", ylab = "PC2 (15.7%)", 
+     main = "normalized, transformed and ANOVA-normalized MEAN data, pareto scaling, centering", col = "white", pch=19)
+text(x, y, labels = mean_anova_transform_norm_biological_samples_selected$Accession, 
+     col = "black", cex = 0.7)
+
+
+dev.off()
+```
+
+
+## PCA scores plot of mean data for frost tolerance, longitude, latitude
+```{r PCA scores plot of mean data for frost tolerance longitude latitude, fig.width=6, fig.height=6}
+x = pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@scores[,1]
+y = pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@scores[,2]
+
+rbPal <- colorRampPalette(c('blue','red'))
+display.brewer.pal(11,"RdYlGn")
+
+# frost tolerance: LT50_ACC
+samplelist_joined_mean$LT50_ACC_col <- rbPal(10)[as.numeric(cut(samplelist_joined_mean$LT50_ACC, breaks = 10))]
+samplelist_joined_mean$LT50_ACC_col[is.na(samplelist_joined_mean$LT50_ACC_col)] <- "grey"
+
+# longitude
+samplelist_joined_mean$Longitude_col <- brewer.pal(11, "RdYlGn")[as.numeric(cut(samplelist_joined_mean$Longitude, breaks = 11))]
+samplelist_joined_mean$Longitude_col[is.na(samplelist_joined_mean$Longitude_col)] <- "grey"
+
+# latitude
+samplelist_joined_mean$Latitude_col <- brewer.pal(11, "RdYlGn")[as.numeric(cut(samplelist_joined_mean$Latitude, breaks = 11))]
+samplelist_joined_mean$Latitude_col[is.na(samplelist_joined_mean$Latitude_col)] <- "grey"
+
+plot(x, y, xlab = "PC1 (23.7%)", ylab = "PC2 (14.3%)", col = samplelist_joined_mean$LT50_ACC_col, pch = 19, main = "LT50_ACC gradient", cex = 1.5)
+text(x, y, labels = samplelist_joined_mean$Accession, col = "black", cex = 0.7)
+
+plot(x, y, xlab = "PC1 (23.7%)", ylab = "PC2 (14.3%)", col = samplelist_joined_mean$Longitude_col, pch = 19, main = "Longitude gradient", cex = 1.5)
+text(x, y, labels = samplelist_joined_mean$Accession,  col = "black", cex = 0.7)
+
+plot(x, y, xlab = "PC1 (23.7%)", ylab = "PC2 (14.3%)", col = samplelist_joined_mean$Latitude_col, pch = 19, main = "Latitude gradient", cex = 1.5)
+text(x, y, labels = samplelist_joined_mean$Accession, col = "black", cex = 0.7)
+
+pairs(pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@scores, 
+      col = samplelist_joined_mean$LT50_ACC_col, 
+      pch=19, main = "no scaling, no centering")
+```
+
+
+## PCA loadings plot of mean data (ANOVA-normalized data after transformation)
+```{r PCA loadings plot of mean data}
+pdf("figures/gcms/pca_loadings_mean_anova_transform_norm_biological_samples_field4.pdf")
+
+x = pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@loadings[,1]
+y = pca_pareto_center_mean_anova_transform_norm_biological_samples_selected@loadings[,2]
+
+palette("default")
+
+plot(x, y, xlab = "PC1", ylab = "PC2", col = "white", pch=19,
+     main = "normalized, transformed and ANOVA-normalized MEAN data, pareto scaling, centering")
+text(x, y, labels = names(x), col = "black", cex = 0.7)
+
+plot(x, y, xlab = "PC1", ylab = "PC2", col = "white", pch=19,
+     main = "normalized, transformed and ANOVA-normalized MEAN data, pareto scaling, centering")
+text(x, y, labels = metabolites_selected$Name_Changed, cex = 0.7, col = as.integer(metabolites_selected$Class))
+
+dev.off()
+
+```
+
+
+# mislabeled samples
+```{r mislabeled samples}
+# 11 samples:
+mislabled_samples <- c("11006if_8", "11026if_19", "11026if_55", "11006if_12", "11006if_9", "11026if_20", "11006if_34", "11026if_44", "11020if_47", "11044if_11", "11020if_56")
+mislabled_samples_idx <- which(samplelist_biological_samples$Rawname_split_30 %in% mislabled_samples)
+
+samplelist_mislab_samples <- droplevels( samplelist_biological_samples[mislabled_samples_idx,] )
+
+# samplelist_biological_samples[mislabled_samples_idx, ]
+
+anova_transform_norm_mislab_samples <- anova_transform_norm_biological_samples_selected_t[mislabled_samples_idx,]
+dim(anova_transform_norm_mislab_samples)
+# 11 samples, 125 metabolites
+
+pca_pareto_center_anova_transform_norm_mislab_samples <- pca(anova_transform_norm_mislab_samples, 
+                                                          method = "svdImpute", nPcs = 5, center = T, scale = "pareto")
+
+pca_pareto_center_anova_transform_norm_mislab_samples@R2
+
+
+s1 <- pca_pareto_center_anova_transform_norm_mislab_samples@scores[,1]
+s2 <- pca_pareto_center_anova_transform_norm_mislab_samples@scores[,2]
+s3 <- pca_pareto_center_anova_transform_norm_mislab_samples@scores[,3]
+s4 <- pca_pareto_center_anova_transform_norm_mislab_samples@scores[,4]
+s5 <- pca_pareto_center_anova_transform_norm_mislab_samples@scores[,5]
+
+pdf("figures/gcms/pca_mislabled_samples.pdf")
+palette("default")
+
+pairs(pca_pareto_center_anova_transform_norm_mislab_samples@scores, pch = 19, col=samplelist_mislab_samples$Accession)
+
+plot(s1, s2, pch = 19, col = samplelist_mislab_samples$Accession)
+text(s1, s2, samplelist_mislab_samples$Vial_ID_split30, pos = 2)
+
+plot(s2, s3, pch = 19, col = samplelist_mislab_samples$Accession)
+text(s2, s3, samplelist_mislab_samples$Vial_ID_split30, pos = 2)
+
+plot(s2, s4, pch = 19, col = samplelist_mislab_samples$Accession)
+text(s2, s4, samplelist_mislab_samples$Vial_ID_split30, pos = 2)
+
+plot(s3, s4, pch = 19, col = samplelist_mislab_samples$Accession)
+text(s3, s4, samplelist_mislab_samples$Vial_ID_split30, pos = 2)
+
+plot(s4, s5, pch = 19, col = samplelist_mislab_samples$Accession)
+text(s4, s5, samplelist_mislab_samples$Vial_ID_split30, pos = 2)
+
+
+
+# highlight mislabeled samples
+x = pca_pareto_center_anova_transform_norm_biological_samples_selected@scores[,1]
+y = pca_pareto_center_anova_transform_norm_biological_samples_selected@scores[,2]
+z = pca_pareto_center_anova_transform_norm_biological_samples_selected@scores[,3]
+
+col_mislab_samples <- rep("grey", 156)
+#col_mislab_samples[mislabled_samples_idx] <- "red"
+col_mislab_samples[which(samplelist_biological_samples$Accession=="Col-0-G1")] <- "green"
+col_mislab_samples[which(samplelist_biological_samples$Accession=="Gre-0")] <- "blue"
+col_mislab_samples[which(samplelist_biological_samples$Vial_ID_split30%in%c("153A", "153B"))] <- "cyan"
+
+col_mislab_samples[which(samplelist_biological_samples$Accession=="Can-0")] <- "orange"
+col_mislab_samples[which(samplelist_biological_samples$Accession=="Bur-0")] <- "red"
+col_mislab_samples[which(samplelist_biological_samples$Vial_ID_split30%in%c("2A", "2B"))] <- "magenta"
+
+pairs(pca_pareto_center_anova_transform_norm_biological_samples_selected@scores, col = col_mislab_samples, pch = 19)
+
+# PC1 vs. PC2
+plot(x, y, xlab = "PC1", ylab = "PC2", col = col_mislab_samples, pch = 19, cex = 1.5)
+text(x, y, labels = samplelist_biological_samples$Vial_ID_split30, col = "black", cex = 1)
+legend("bottomleft", cex = 0.7,
+       legend = c("Col-0-G1", "Gre-0", "153A/B", "Can-0", "Bur-0", "2A/B"), 
+       fill = c("green", "blue", "cyan", "orange", "red", "magenta"))
+
+# PC1 vs. PC3
+plot(x, z, xlab = "PC1", ylab = "PC3", col = col_mislab_samples, pch = 19, cex = 1.5)
+text(x, z, labels = samplelist_biological_samples$Vial_ID_split30, col = "black", cex = 1)
+legend("bottomleft", cex = 0.7,
+       legend = c("Col-0-G1", "Gre-0", "153A/B", "Can-0", "Bur-0", "2A/B"), 
+       fill = c("green", "blue", "cyan", "orange", "red", "magenta"))
+
+# PC2 vs. PC3
+plot(y, z, xlab = "PC2", ylab = "PC3", col = col_mislab_samples, pch = 19, cex = 1.5)
+text(y, z, labels = samplelist_biological_samples$Vial_ID_split30, col = "black", cex = 1)
+legend("bottomright", cex = 0.7, horiz = T,
+       legend = c("Col-0-G1", "Gre-0", "153A/B", "Can-0", "Bur-0", "2A/B"), 
+       fill = c("green", "blue", "cyan", "orange", "red", "magenta"))
+
+dev.off()
+```
+
+
+
+# Save workspace
+```{r save workspace}
+save.image("gcms_arafield_4.RData")
+```
+
