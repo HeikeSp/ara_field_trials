@@ -43,9 +43,9 @@ opts_knit$set(root.dir = '../')
 
 # Source functions
 ```{r source functions}
-source("../libpurzel/func_bw_plot.R")
-source("../libpurzel/func_boxplot.R")
-source("../libpurzel/func_cv.R")
+source("../functions/func_bw_plot.R")
+source("../functions/func_boxplot.R")
+source("../functions/func_cv.R")
 ```
 
 

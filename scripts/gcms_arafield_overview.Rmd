@@ -45,20 +45,20 @@ opts_knit$set(root.dir = '../')
 
 
 ```{r source R scripts, include=FALSE}
-source("../libpurzel/colors.R")
+source("../functions/colors.R")
 
-source("../libpurzel/RemoveFactors_function.R")
-source("../libpurzel/func_normalize.R")
-source("../libpurzel/func_log_transform.R")
+source("../functions/RemoveFactors_function.R")
+source("../functions/func_normalize.R")
+source("../functions/func_log_transform.R")
 
-source("../libpurzel/func_check_norm_dist.R")
-source("../libpurzel/find_one_outlier.R")
-source("../libpurzel/func_hist_outlier.R")
-source("../libpurzel/func_replace_outlier.R")
+source("../functions/func_check_norm_dist.R")
+source("../functions/find_one_outlier.R")
+source("../functions/func_hist_outlier.R")
+source("../functions/func_replace_outlier.R")
 
-source("../libpurzel/func_pca_plots.R")
+source("../functions/func_pca_plots.R")
 
-source("../libpurzel/func_cor_mtest.R")
+source("../functions/func_cor_mtest.R")
 ```
 
 
