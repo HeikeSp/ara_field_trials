@@ -1,0 +1,608 @@
+---
+title: "Transformation of metabolite data Arabidopsis field trials"
+author: "Heike Sprenger"
+date: "July 17, 2016"
+output:
+  html_document:
+    highlight: tango
+    number_section: yes
+    theme: cerulean
+    toc: yes
+    toc_float: true
+    toc_depth: 4
+---
+
+# Set working directory  
+```{r set working directory}
+#getwd()
+#setwd("D:/work/repos/ara_field_trials/")
+#setwd("~/work/repos/ara_field_trials/")
+```
+
+# Load workspace, packages and scripts
+```{r load workspace, include=TRUE, message=FALSE}
+# load packages
+library(knitr)
+library(pander)
+library(ggplot2)
+library(DAAG)
+library(leaps)
+library(faraway)
+library(MASS)
+library(car)
+
+# set options for knitr
+opts_chunk$set(fig.width=10, fig.height=5)
+opts_knit$set(root.dir = '../')
+
+# load workspace
+#load("metabolite_arafield.RData")
+```
+
+
+# Load data
+Use changed metabolite data, from ``metabolite_arafield4_overview4.Rmd``
+```{r load data}
+metabolite_arafield2 <- read.table("output/metabolite_arafield2.txt", header=TRUE, sep="\t")
+metabolite_arafield3 <- read.table("output/metabolite_arafield3.txt", header=TRUE, sep="\t")
+metabolite_arafield4 <- read.table("output/metabolite_arafield4.txt", header=TRUE, sep="\t")
+
+lt50 <- read.table("data/LT50.txt", header=TRUE, sep="\t")
+pander(head(lt50))
+
+yCapacity4full <- metabolite_arafield4$LT50ACC - metabolite_arafield4$LT50NAC 
+yCapacity <- lt50$LT50ACC - lt50$LT50NAC
+```
+
+
+# Prolin als Beispiel fuer Transformation
+## Histogramm und q-q-plot vor Transformation
+```{r prolin as example}
+pdf("figures/Metabolite_AraField4_Pro_norm_dist.pdf", 9, 5)
+par(mfrow=c(1,2))
+hist(metabolite_arafield4$proline_positive, freq=FALSE, main="Histogramm", 
+     xlab="Konzentration in mg/g FG", ylim=c(0,8),ylab="relative Haeufigkeitsdichte", cex.main=1.3)
+lines(density(metabolite_arafield4$proline_positive), col="red")
+text(0.3,7, paste("Shapiro-Test: \n P-Wert = \n ",round(shapiro.test(metabolite_arafield4$proline_positive)$p.value, digits=14)), cex=1.1)
+qqnorm(metabolite_arafield4$proline_positive,cex.main=1.3, ylab= "tatsaechliche Quantile", xlab="theoretische Quantile")
+qqline(metabolite_arafield4$proline_positive)
+par(mfrow=c(1,1))
+dev.off()
+
+# find optimal transformation parameter lambda
+lambda.pro4 <- boxcox(metabolite_arafield4$proline_positive ~ 1)
+lambda.max.pro4 <- lambda.pro4$x[which.max(lambda.pro4$y)]
+# -0.0606
+
+# --> log-Transformation (ln)
+bc.pro4 <- bcPower(metabolite_arafield4$proline_positive, lambda = 0)   
+
+# lambda of zero corresponds to log()
+# default: natural logarithm
+# log(metabolite_arafield4$proline_positive) 
+
+pdf("figures/Metabolite_AraField4_Pro_boxcox.pdf", 5,5)
+boxcox(metabolite_arafield4$proline_positive ~ 1)     
+title(main="Box-Cox-Plot", cex.main=1.3)
+dev.off()
+
+pdf("figures/Metabolite_AraField4_ProT_norm_dist.pdf", 9,5)
+par(mfrow=c(1,2))
+hist(bc.pro4, freq=FALSE, main="Histogramm", 
+     xlab=expression("log"[e]*"(Konzentration in mg/g FG)"), 
+     ylim=c(0,0.8),ylab="relative Haeufigkeitsdichte", cex.main=1.3)
+lines(density(bc.pro4), col="red")
+text(-3.4,0.7, paste("Shapiro-Test: \n P-Wert = \n ",
+                     round(shapiro.test(bc.pro4)$p.value, 
+                           digits=2)), cex=1.1)
+qqnorm(bc.pro4, cex.main=1.3, 
+       ylab= "tatsaechliche Quantile", 
+       xlab="theoretische Quantile")
+qqline(bc.pro4)
+par(mfrow=c(1,1))
+dev.off()
+```
+
+
+# Histograms to vizualize distribution of metabolite values 
+```{r histograms to vizualize distribution of metabolite values}
+
+func_hist <- function(x_values, main_text, xlab_text = "concentration in µmol/g FW", 
+                      ylab_text = "relative frequency", text_y = 0.05, ylim_values = NULL){
+  hist(x_values, ylim = ylim_values,
+       freq = FALSE, main = main_text,
+       xlab = xlab_text, ylab = ylab_text,
+       cex.main = 1.5, cex.axis = 1.3, cex.lab = 1.3)
+  
+  lines(density(x_values, na.rm = T), col = "red")
+  
+  text(summary(x_values)[5], text_y, 
+       paste("P-value = \n ", format(shapiro.test(x_values)$p.value, scientific = TRUE, digits = 3)), 
+       cex = 1.3)
+}
+```
+
+
+## Histograms LT50
+```{r histograms LT50}
+pdf("figures/LT50_Histogramme.pdf")
+par(mar=c(5.1, 5.1, 4.1, 2.1))
+
+func_hist(lt50$LT50NAC, main_text = "freezing tolerance non-acclimated plants",
+          xlab_text = expression("LT"[50]*"NAC in °C"))
+
+func_hist(lt50$LT50ACC, main_text = "freezing tolerance acclimated plants",
+          xlab_text = expression("LT"[50]*"ACC in °C"))
+
+func_hist(lt50$LT50ACC, main_text = "acclimation capacity",
+          xlab_text = expression("acclimation capacity of LT"[50]*" in °C"))
+dev.off()
+```
+
+
+## Histograms Field 2
+```{r histograms field 2}
+pdf("figures/Metabolite_AraField2_Histogramme.pdf")
+par(mar=c(5.1, 5.1, 4.1, 2.1))
+func_hist(metabolite_arafield2$glucose_positive, main_text = "glucose", ylim_values = c(0, 0.08))
+func_hist(metabolite_arafield2$fructose_positive, main_text = "fructose")
+func_hist(metabolite_arafield2$sucrose_positive, main_text = "sucrose")
+func_hist(metabolite_arafield2$raffinose_positive, main_text = "raffinose")
+func_hist(metabolite_arafield2$amino_acids_positive, main_text = "amino acids")
+func_hist(metabolite_arafield2$malate_positive, main_text = "malate")
+func_hist(metabolite_arafield2$fumarate_positive, main_text = "fumarate")
+func_hist(metabolite_arafield2$proline_positive, main_text = "proline")
+dev.off()
+```
+
+
+## Histograms Field 3
+```{r histograms field 3}
+pdf("figures/Metabolite_AraField3_Histogramme.pdf")
+par(mar=c(5.1, 5.1, 4.1, 2.1))
+func_hist(metabolite_arafield3$glucose_positive, main_text = "glucose", ylim_values = c(0, 0.08))
+func_hist(metabolite_arafield3$fructose_positive, main_text = "fructose")
+func_hist(metabolite_arafield3$sucrose_positive, main_text = "sucrose")
+func_hist(metabolite_arafield3$raffinose_positive, main_text = "raffinose")
+func_hist(metabolite_arafield3$amino_acids_positive, main_text = "amino acids")
+func_hist(metabolite_arafield3$malate_positive, main_text = "malate")
+func_hist(metabolite_arafield3$fumarate_positive, main_text = "fumarate")
+func_hist(metabolite_arafield3$proline_positive, main_text = "proline")
+dev.off()
+```
+
+
+## Histograms Field 4
+```{r histograms field 4}
+pdf("figures/Metabolite_AraField4_Histogramme.pdf")
+par(mar=c(5.1, 5.1, 4.1, 2.1))
+func_hist(metabolite_arafield4$glucose_positive, main_text = "glucose", ylim_values = c(0, 0.08))
+func_hist(metabolite_arafield4$fructose_positive, main_text = "fructose")
+func_hist(metabolite_arafield4$sucrose_positive, main_text = "sucrose")
+func_hist(metabolite_arafield4$raffinose_positive, main_text = "raffinose")
+func_hist(metabolite_arafield4$amino_acids_positive, main_text = "amino acids")
+func_hist(metabolite_arafield4$malate_positive, main_text = "malate")
+func_hist(metabolite_arafield4$fumarate_positive, main_text = "fumarate")
+func_hist(metabolite_arafield4$proline_positive, main_text = "proline")
+func_hist(metabolite_arafield4$anthocyanin_positive, main_text = "anthocyanins")
+dev.off()
+```
+
+
+# Shapiro-test
+```{r shapiro-test}
+# Durchfuehrung des Shapiro-Tests fuer alle Variablen mit Hilfe einer Funktion
+shaptest <- function(n) shapiro.test(n)$p.value
+
+apply(metabolite_arafield4[,c(32:40)], 2, shaptest)
+#     glucose_positive    fructose_positive     sucrose_positive   raffinose_positive amino_acids_positive 
+#             4.74e-03             6.07e-05             4.94e-09             1.95e-03             8.94e-06 
+#      malate_positive    fumarate_positive     proline_positive anthocyanin_positive 
+#             5.31e-01             1.32e-08             5.41e-12             7.36e-05
+
+# Shapiro-Test, Nullhypothese: Annahme der Normalverteilung (Ablehnung von H0, wenn p.value<0.05)
+
+shapiro.test(lt50$LT50NAC)$p.value
+# 0.09320482
+shapiro.test(lt50$LT50ACC)$p.value
+# 0.02803665
+shapiro.test(yCapacity)$p.value
+# 0.2397006
+```
+
+
+# Box-Cox Transformations for Linear Models
+**Computes and optionally plots profile log-likelihoods for the parameter of the Box-Cox power transformation.**
+
+## boxcox plots field LT50
+```{r boxcox plots LT50}
+pdf("figures/LT50_boxcox.pdf")
+boxcox(abs(lt50$LT50NAC) ~ 1)
+title(main="Box-Cox-Plot LT50NAC", cex.main=1.3)
+
+boxcox(abs(lt50$LT50ACC) ~ 1)
+title(main="Box-Cox-Plot LT50ACC", cex.main=1.3)
+
+boxcox(abs(yCapacity) ~ 1)
+title(main="Box-Cox-Plot Capacity", cex.main=1.3)
+dev.off()
+```
+
+
+## boxcox plots field 2
+```{r boxcox plots field 2}
+pdf("figures/Metabolite_AraField2_boxcox.pdf")
+boxcox(metabolite_arafield4$glucose_positive ~ 1)
+title(main="Box-Cox-Plot glucose", cex.main=1.3)
+
+boxcox(metabolite_arafield2$fructose_positive ~ 1)
+title(main="Box-Cox-Plot fructose", cex.main=1.3)
+
+boxcox(metabolite_arafield2$sucrose_positive ~ 1)
+title(main="Box-Cox-Plot sucrose", cex.main=1.3)
+
+boxcox(metabolite_arafield2$raffinose_positive ~ 1)
+title(main="Box-Cox-Plot raffinose", cex.main=1.3)
+
+boxcox(metabolite_arafield2$amino_acids_positive ~ 1)
+title(main="Box-Cox-Plot amino acids", cex.main=1.3)
+
+boxcox(metabolite_arafield2$malate_positive ~ 1) 
+title(main="Box-Cox-Plot malate", cex.main=1.3)
+
+boxcox(metabolite_arafield2$fumarate_positive ~ 1)
+title(main="Box-Cox-Plot fumarate", cex.main=1.3)
+
+boxcox(metabolite_arafield2$proline_positive ~ 1)  
+title(main="Box-Cox-Plot proline", cex.main=1.3)
+dev.off()
+```
+
+## boxcox plots field 3
+```{r boxcox plots field 3}
+pdf("figures/Metabolite_Arafield3_boxcox.pdf")
+boxcox(metabolite_arafield3$glucose_positive ~ 1)
+title(main="Box-Cox-Plot glucose", cex.main=1.3)
+
+boxcox(metabolite_arafield3$fructose_positive ~ 1)
+title(main="Box-Cox-Plot fructose", cex.main=1.3)
+
+boxcox(metabolite_arafield3$sucrose_positive ~ 1)
+title(main="Box-Cox-Plot sucrose", cex.main=1.3)
+
+boxcox(metabolite_arafield3$raffinose_positive ~ 1)
+title(main="Box-Cox-Plot raffinose", cex.main=1.3)
+
+boxcox(metabolite_arafield3$amino_acids_positive ~ 1)
+title(main="Box-Cox-Plot amino acids", cex.main=1.3)
+
+boxcox(metabolite_arafield3$malate_positive ~ 1)        
+title(main="Box-Cox-Plot malate", cex.main=1.3)
+
+boxcox(metabolite_arafield3$fumarate_positive ~ 1)
+title(main="Box-Cox-Plot fumarate", cex.main=1.3)
+
+boxcox(metabolite_arafield3$proline_positive ~ 1) 
+title(main="Box-Cox-Plot proline", cex.main=1.3)
+dev.off()
+```
+
+## boxcox plots field 4
+```{r boxcox plots field 4}
+pdf("figures/Metabolite_AraField4_boxcox.pdf")
+boxcox(metabolite_arafield4$glucose_positive ~ 1)
+title(main="Box-Cox-Plot glucose", cex.main=1.3)
+
+boxcox(metabolite_arafield4$fructose_positive ~ 1)
+title(main="Box-Cox-Plot fructose", cex.main=1.3)
+
+boxcox(metabolite_arafield4$sucrose_positive ~ 1)
+title(main="Box-Cox-Plot sucrose", cex.main=1.3)
+
+boxcox(metabolite_arafield4$raffinose_positive ~ 1)
+title(main="Box-Cox-Plot raffinose", cex.main=1.3)
+
+boxcox(metabolite_arafield4$amino_acids_positive ~ 1)
+title(main="Box-Cox-Plot amino acids", cex.main=1.3)
+
+boxcox(metabolite_arafield4$malate_positive ~ 1)         # lambda = 1 --> keine Transformation noetig
+title(main="Box-Cox-Plot malate", cex.main=1.3)
+
+boxcox(metabolite_arafield4$fumarate_positive ~ 1)
+title(main="Box-Cox-Plot fumarate", cex.main=1.3)
+
+boxcox(metabolite_arafield4$proline_positive ~ 1)      # lambda = 0 --> log Transformation
+title(main="Box-Cox-Plot proline", cex.main=1.3)
+
+boxcox(metabolite_arafield4$anthocyanin_positive ~ 1)
+title(main="Box-Cox-Plot anthocyanins", cex.main=1.3)
+dev.off()
+```
+
+
+# Transformation of metabolite values
+```{r transformation of metabolite values}
+# idx_arafield4 <- with(metabolite_arafield4, which(sucrose_positive<33))
+# metabolite_arafield4A <- metabolite_arafield4[idx_arafield4,]
+
+func_bc_transform <- function(x_values){
+  
+  print(paste("p-value before transformation: ", format(shapiro.test(x_values)$p.value, scientific = T)))
+  
+  lambda_value <- boxcox(x_values ~ 1)
+  lambda_max <- lambda_value$x[which.max(lambda_value$y)]
+  print(paste("lambda for maximal log-likelihood: ", lambda_max))
+  
+  x_transformed <- bcPower(x_values, lambda_max)
+  print(paste("p-value after transformation: ", format(shapiro.test(x_transformed)$p.value, scientific = T)))
+  
+  return(x_transformed)
+}
+```
+
+
+## Transformation: Field 3
+```{r transformation field 2}
+bc.glc2 <- func_bc_transform(metabolite_arafield2$glucose_positive)
+bc.frc2 <- func_bc_transform(metabolite_arafield2$fructose_positive)
+bc.suc2 <- func_bc_transform(metabolite_arafield2$sucrose_positive)
+bc.raf2 <- func_bc_transform(metabolite_arafield2$raffinose_positive)
+bc.aa2 <- func_bc_transform(metabolite_arafield2$amino_acids_positive)
+bc.mal2 <- func_bc_transform(metabolite_arafield2$malate_positive)
+bc.fum2 <- func_bc_transform(metabolite_arafield2$fumarate_positive)
+bc.pro2 <- func_bc_transform(metabolite_arafield2$proline_positive)
+```
+
+
+## Transformation: Field 3
+```{r transformation field 3}
+bc.glc3 <- func_bc_transform(metabolite_arafield3$glucose_positive)
+bc.frc3 <- func_bc_transform(metabolite_arafield3$fructose_positive)
+bc.suc3 <- func_bc_transform(metabolite_arafield3$sucrose_positive)
+bc.raf3 <- func_bc_transform(metabolite_arafield3$raffinose_positive)
+bc.aa3 <- func_bc_transform(metabolite_arafield3$amino_acids_positive)
+bc.mal3 <- func_bc_transform(metabolite_arafield3$malate_positive)
+bc.fum3 <- func_bc_transform(metabolite_arafield3$fumarate_positive)
+bc.pro3 <- func_bc_transform(metabolite_arafield3$proline_positive)
+```
+
+
+## Transformation: Field 4
+```{r transformation field 4}
+bc.glc4 <- func_bc_transform(metabolite_arafield4$glucose_positive)
+bc.frc4 <- func_bc_transform(metabolite_arafield4$fructose_positive)
+bc.suc4 <- func_bc_transform(metabolite_arafield4$sucrose_positive)
+bc.raf4 <- func_bc_transform(metabolite_arafield4$raffinose_positive)
+bc.aa4 <- func_bc_transform(metabolite_arafield4$amino_acids_positive)
+bc.mal4 <- func_bc_transform(metabolite_arafield4$malate_positive) # 1.07 --> keine Transformation noetig
+bc.fum4 <- func_bc_transform(metabolite_arafield4$fumarate_positive)
+bc.pro4 <- func_bc_transform(metabolite_arafield4$proline_positive)
+bc.antho4 <- func_bc_transform(metabolite_arafield4$anthocyanin_positive)
+```
+
+
+# Plots for transformation of metabolite values
+```{r plots for transformation of metabolite values}
+
+func_plot_transform <- function(x_values, main_text, xlab_text = "concentration in µmol/g FW", 
+                                ylab_text = "relative frequency", text_y = 0.05, ylim_values = NULL,
+                                x_transformed){
+  hist(x_values, ylim = ylim_values,
+       freq = FALSE, main = main_text,
+       xlab = xlab_text, ylab = ylab_text,
+       cex.main = 1.3, cex.axis = 1.3, cex.lab = 1.3)
+  
+  lines(density(x_values, na.rm = T), col = "red")
+  
+  text(summary(x_values)[5], text_y, 
+       paste("P-value = \n ", format(shapiro.test(x_values)$p.value, scientific = TRUE, digits = 3)), 
+       cex = 1.3)
+  
+  boxCox(x_values ~ 1)
+  title(main = "Box-Cox-Plot", cex.main = 1.3)
+  
+  hist(x_transformed, freq = FALSE, main = "after transformation", xlab = xlab_text, 
+       ylab = ylab_text, cex.main=1.3)
+  
+  lines(density(x_transformed, na.rm = T), col = "red")
+  
+  text(summary(x_transformed)[5], text_y,
+       paste("P-value = \n ", format(shapiro.test(x_transformed)$p.value, scientific = TRUE, digits = 3)),
+       cex = 1.3)
+  
+  qqnorm(x_transformed, cex.main = 1.3)
+  qqline(x_transformed)
+}
+```
+
+## Plots for transformation of metabolite values: Field 2
+```{r plots for transformation of metabolite values field 2}
+pdf("figures/Metabolite_AraField2_NV.pdf")
+par(mfrow=c(2,2))
+par(mar=c(5.1, 5.1, 4.1, 2.1))  
+func_plot_transform(metabolite_arafield2$glucose_positive, main_text = "glucose", ylim_values = c(0, 0.08), x_transformed = bc.glc2)
+func_plot_transform(metabolite_arafield2$fructose_positive, main_text = "fructose", x_transformed = bc.frc2)
+func_plot_transform(metabolite_arafield2$sucrose_positive, main_text = "sucrose", x_transformed = bc.suc2)
+func_plot_transform(metabolite_arafield2$raffinose_positive, main_text = "raffinose", x_transformed = bc.raf2)
+func_plot_transform(metabolite_arafield2$amino_acids_positive, main_text = "amino acids", x_transformed = bc.aa2)
+func_plot_transform(metabolite_arafield2$malate_positive, main_text = "malate", x_transformed = bc.mal2)
+func_plot_transform(metabolite_arafield2$fumarate_positive, main_text = "fumarate", x_transformed = bc.fum2)
+func_plot_transform(metabolite_arafield2$proline_positive, main_text = "proline", x_transformed = bc.pro2)
+dev.off()
+```
+
+
+## Plots for transformation of metabolite values: Field 3
+```{r plots for transformation of metabolite values field 3}
+pdf("figures/Metabolite_AraField3_NV.pdf")
+par(mfrow=c(2,2))
+par(mar=c(5.1, 5.1, 4.1, 2.1))  
+func_plot_transform(metabolite_arafield3$glucose_positive, main_text = "glucose", ylim_values = c(0, 0.08), x_transformed = bc.glc3)
+func_plot_transform(metabolite_arafield3$fructose_positive, main_text = "fructose", x_transformed = bc.frc3)
+func_plot_transform(metabolite_arafield3$sucrose_positive, main_text = "sucrose", x_transformed = bc.suc3)
+func_plot_transform(metabolite_arafield3$raffinose_positive, main_text = "raffinose", x_transformed = bc.raf3)
+func_plot_transform(metabolite_arafield3$amino_acids_positive, main_text = "amino acids", x_transformed = bc.aa3)
+func_plot_transform(metabolite_arafield3$malate_positive, main_text = "malate", x_transformed = bc.mal3)
+func_plot_transform(metabolite_arafield3$fumarate_positive, main_text = "fumarate", x_transformed = bc.fum3)
+func_plot_transform(metabolite_arafield3$proline_positive, main_text = "proline", x_transformed = bc.pro3)
+dev.off()
+```
+
+
+## Plots for transformation of metabolite values: Field 4
+```{r plots for transformation of metabolite values field 4}
+pdf("figures/Metabolite_AraField4_NV.pdf")
+par(mfrow=c(2,2))
+par(mar=c(5.1, 5.1, 4.1, 2.1))  
+func_plot_transform(metabolite_arafield4$glucose_positive, main_text = "glucose", ylim_values = c(0, 0.08), x_transformed = bc.glc4)
+func_plot_transform(metabolite_arafield4$fructose_positive, main_text = "fructose", x_transformed = bc.frc4)
+func_plot_transform(metabolite_arafield4$sucrose_positive, main_text = "sucrose", x_transformed = bc.suc4)
+func_plot_transform(metabolite_arafield4$raffinose_positive, main_text = "raffinose", x_transformed = bc.raf4)
+func_plot_transform(metabolite_arafield4$amino_acids_positive, main_text = "amino acids", x_transformed = bc.aa4)
+func_plot_transform(metabolite_arafield4$malate_positive, main_text = "malate", x_transformed = bc.mal4)
+func_plot_transform(metabolite_arafield4$fumarate_positive, main_text = "fumarate", x_transformed = bc.fum4)
+func_plot_transform(metabolite_arafield4$proline_positive, main_text = "proline", x_transformed = bc.pro4)
+func_plot_transform(metabolite_arafield4$anthocyanin_positive, main_text = "anthocyanins", x_transformed = bc.antho4)
+dev.off()
+```
+
+
+# add transformed data to dataset
+```{r add transformed data to dataset}
+
+# field 2
+metabolite_arafield2 <- data.frame(metabolite_arafield2, 
+                                   bc.glc2, bc.frc2, bc.suc2, bc.raf2, 
+                                   bc.aa2, bc.mal2, bc.fum2, bc.pro2)
+
+colnames(metabolite_arafield2)[c(40:47)] <- c("glucoseT", "fructoseT","sucroseT","raffinoseT",
+                                           "amino_acidsT", "malateT", "fumarateT","prolineT")
+
+# field 3
+metabolite_arafield3 <- data.frame(metabolite_arafield3, 
+                                   bc.glc3, bc.frc3, bc.suc3, bc.raf3, 
+                                   bc.aa3, bc.mal3, bc.fum3, bc.pro3)
+
+colnames(metabolite_arafield3)[c(41:48)] <- c("glucoseT", "fructoseT","sucroseT","raffinoseT",
+                                           "amino_acidsT", "malateT","fumarateT","prolineT")
+
+# field 4
+metabolite_arafield4 <- data.frame(metabolite_arafield4, 
+                                   bc.glc4, bc.frc4, bc.suc4, bc.raf4, 
+                                   bc.aa4, bc.mal4, bc.fum4, bc.pro4, bc.antho4)
+
+colnames(metabolite_arafield4)[c(44:52)] <- c("glucoseT", "fructoseT","sucroseT","raffinoseT",
+                                           "amino_acidsT", "malateT","fumarateT","prolineT","anthocyaninT")
+
+
+write.table(metabolite_arafield2, file="output/metabolite_arafield2_modified.txt", sep="\t")
+write.table(metabolite_arafield3, file="output/metabolite_arafield3_modified.txt", sep="\t")
+write.table(metabolite_arafield4, file="output/metabolite_arafield4_modified.txt", sep="\t")
+```
+
+
+# regression model for transformed data of continious variables --> now: normal distribution!
+```{r regression model for transformed data of continious variables}
+# arafield4_regressiondataT <- data.frame(accession = accession4, 
+#                                         plant_name = plant_name4, 
+#                                         yLT50ACC = yLT50ACC4, 
+#                                         yLT50NAC = yLT50NAC4, 
+#                                         glc = bc.glc4_part,
+#                                         frc = bc.frc4_part, 
+#                                         suc = bc.suc4_part, 
+#                                         raf = bc.raf4_part, 
+#                                         aa = bc.aa4_part, 
+#                                         mal = mal4, 
+#                                         fum = bc.fum4_part, 
+#                                         pro = bc.pro4_part, 
+#                                         antho = bc.antho4_part,
+#                                         norm_bbch = norm_bbch_id4, 
+#                                         anthoscore = anthoscore4)
+# 
+# rownames(arafield4_regressiondataT)=arafield4_regressiondataT$plant_name
+# # --> im Plot werden die Ausreisser spaeter nicht mit Zeilennummer, sondern Plant_name bezeichnet
+# 
+# arafield4_regressionACC_T=lm(yLT50ACC~glc + frc + suc + raf + aa + mal + fum + pro + antho + norm_bbch + anthoscore, data=arafield4_regressiondataT)
+# 
+# anova(arafield4_regressionACC_T)
+# #Analysis of Variance Table
+# #Response: yLT50ACC
+# #           Df  Sum Sq Mean Sq F value    Pr(>F)
+# #glc         1   3.258   3.258  1.4322   0.23432
+# #frc         1  11.335  11.335  4.9826   0.02790 *
+# #suc         1   3.222   3.222  1.4164   0.23690
+# #raf         1  51.071  51.071 22.4496 7.381e-06 ***
+# #aa          1   1.791   1.791  0.7873   0.37712
+# #mal         1   0.251   0.251  0.1104   0.74044
+# #fum         1   8.911   8.911  3.9172   0.05063 .
+# #pro         1   3.906   3.906  1.7168   0.19320
+# #antho       1   7.771   7.771  3.4161   0.06761 .
+# #norm_bbch   1  39.058  39.058 17.1691 7.314e-05 ***
+# #anthoscore  1   3.716   3.716  1.6333   0.20430
+# #Residuals  97 220.668   2.275
+# #---
+# #Signif. codes:  0 ?***? 0.001 ?**? 0.01 ?*? 0.05 ?.? 0.1 ? ? 1
+# 
+# summary(arafield4_regressionACC_T)
+# #Call:
+# #lm(formula = yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum +
+# #    pro + antho + norm_bbch + anthoscore, data = arafield4_regressiondataT)
+# #Residuals:
+# #    Min      1Q  Median      3Q     Max
+# #-3.2620 -1.0247  0.1277  0.9504  4.1400
+# 
+# #Coefficients:
+# #            Estimate Std. Error t value Pr(>|t|)
+# #(Intercept) -8.75880    2.42335  -3.614  0.00048 ***
+# #glc          0.01476    0.16431   0.090  0.92858
+# #frc          0.21714    0.20780   1.045  0.29864
+# #suc          0.51881    0.74483   0.697  0.48775
+# #raf         -1.99672    0.48953  -4.079 9.28e-05 ***
+# #aa          -0.36141    0.74712  -0.484  0.62966
+# #mal          0.01218    0.03161   0.385  0.70085
+# #fum         -0.12285    0.10354  -1.187  0.23830
+# #pro          0.13492    0.40857   0.330  0.74194
+# #antho        0.52902    0.30294   1.746  0.08393 .
+# #norm_bbch    0.93689    0.22645   4.137 7.49e-05 ***
+# #anthoscore  -0.27551    0.21558  -1.278  0.20430
+# #---
+# #Signif. codes:  0 ?***? 0.001 ?**? 0.01 ?*? 0.05 ?.? 0.1 ? ? 1
+# #Residual standard error: 1.508 on 97 degrees of freedom
+# #Multiple R-squared: 0.3783,     Adjusted R-squared: 0.3078
+# #F-statistic: 5.366 on 11 and 97 DF,  p-value: 1.348e-06
+# 
+# # kompletter Datensatz von Feld 4 mit transformierten Variablen
+# metabolite_arafield4T = data.frame(accession=metabolite_arafield4$accession, plant_name=metabolite_arafield4$plant_name, glc=bc.glc4,
+# frc=bc.frc4, suc=bc.suc4, raf=bc.raf4, aa=bc.aa4, mal=metabolite_arafield4$malate_positive, fum=bc.fum4, pro=bc.pro4, antho=bc.antho4,
+# norm_bbch=metabolite_arafield4$norm_bbch_id, anthoscore=metabolite_arafield4$anthoscore)
+# 
+# # Test-Datensatz mit Akzessionen bekannter LT50-Werte (nicht im Modell enthalten)
+# idx_test4T=which(metabolite_arafield4T$accession %in% c("Be-0","Bsch-2.2", "Bsch-2.78", "Je54", "RRS-7", "Ty-0", "Van-0"))
+# arafield4_predictiondataT= metabolite_arafield4T[idx_test4T,]
+# 
+# 
+# sum(((predict(arafield4_regressionACC_T, arafield4_predictiondataT))-(measuredLT50ACC))^2) / sum((measuredLT50ACC)^2)
+# # 0.0831478
+# sum(((predict(arafield4_regressionACC_T, arafield4_predictiondataT))-(measuredLT50ACC))^2)
+# # 89.285
+# 
+# 
+# arafield4_regressionACC_T_step=stepAIC(arafield4_regressionACC_T)
+# sum(((predict(arafield4_regressionACC_T_step, arafield4_predictiondataT))-(measuredLT50ACC))^2) / sum((measuredLT50ACC)^2)
+# # 0.07823122
+# sum(((predict(arafield4_regressionACC_T_step, arafield4_predictiondataT))-(measuredLT50ACC))^2)
+# # 84.00551
+# 
+# par(mfrow=c(2,3))
+# plot(arafield4_regressionACC_T, which = 1:6)
+```
+
+
+
+
+## save workspace
+```{r save workspace}
+save.image("metabolite_arafield.RData")
+```
+
+
