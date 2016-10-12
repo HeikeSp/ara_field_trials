@@ -27,7 +27,7 @@ library(pander)
 library(ggplot2)
 
 # set options for knitr
-opts_chunk$set(fig.width=10, fig.height=5)
+opts_chunk$set(fig.width=6, fig.height=5, tidy=TRUE, tidy.opts=list(width.cutoff=70))
 opts_knit$set(root.dir = '../')
 
 # load workspace
@@ -35,29 +35,28 @@ opts_knit$set(root.dir = '../')
 ```
 
 # Load data
-```{r load data}
+```{r load data, tidy=TRUE}
 metabolite_arafield2_all <- read.table("data/Metabolite_AraField2.txt", header=TRUE, sep="\t")
-metabolite_arafield2 <- read.table("data/Metabolite_AraField2_ohneMissingValues.txt", header=TRUE, sep="\t")
-metabolite_arafield3 <- read.table("data/Metabolite_AraField3.txt", header=TRUE, sep="\t")
-metabolite_arafield4 <- read.table("data/Metabolite_AraField4.txt", header=TRUE, sep="\t")
+metabolite_arafield2_original <- read.table("data/Metabolite_AraField2_ohneMissingValues.txt", header=TRUE, sep="\t")
+metabolite_arafield3_original <- read.table("data/Metabolite_AraField3.txt", header=TRUE, sep="\t")
+metabolite_arafield4_original <- read.table("data/Metabolite_AraField4.txt", header=TRUE, sep="\t")
 
 dim(metabolite_arafield2_all)
 # 122 samples
-dim(metabolite_arafield2)
+dim(metabolite_arafield2_original)
 # 94 samples --> only samples with information for metabolites
 
-length(levels(metabolite_arafield2_all$accession))
-# 56
-length(levels(metabolite_arafield2$accession))
-# 51
-length(levels(metabolite_arafield3$accession))
-length(levels(metabolite_arafield4$accession))
+length(levels(metabolite_arafield2_all$accession))  # 56
+length(levels(metabolite_arafield2_original$accession)) # 51
+length(levels(metabolite_arafield3_original$accession)) # 77
+length(levels(metabolite_arafield4_original$accession)) # 75
 
-metabolite_arafield2$versuch_id[which(metabolite_arafield2$versuch_id == 52)] <- 43
+metabolite_arafield2_original$versuch_id[which(metabolite_arafield2_original$versuch_id == 52)] <- 43
 
-pander(metabolite_arafield4[1:5,1:10])
+pander(metabolite_arafield4_original[1:5,1:10])
 
-lt50 <- read.table("data/LT50.txt", header=TRUE, sep="\t")
+lt50 <- read.table("data/LT50_64acc.txt", header=TRUE, sep="\t")
+dim(lt50) # 64 accessions
 pander(head(lt50))
 ```
 
@@ -65,25 +64,45 @@ pander(head(lt50))
 # Anthocyan score
 ```{r anthocyan score}
 # gibt verschiedene Levels des Faktors "antho_value" --> Anthocyan-Score
-levels(metabolite_arafield4$antho_value)
-table(metabolite_arafield2$antho_value)
-table(metabolite_arafield3$antho_value)
-table(metabolite_arafield4$antho_value)
+levels(metabolite_arafield4_original$antho_value)
 
-# Ordnen der Levels
-metabolite_arafield2$antho_value <- factor(metabolite_arafield2$antho_value, levels = c("sehr gering", "gering", "mittel", "hoch", "sehr hoch"))
-metabolite_arafield3$antho_value <- factor(metabolite_arafield3$antho_value, levels = c("gering", "mittel", "hoch", "sehr hoch"))
-metabolite_arafield4$antho_value <- factor(metabolite_arafield4$antho_value, levels = c("sehr gering", "gering", "mittel", "hoch", "sehr hoch"))
-levels(metabolite_arafield4$antho_value)
+table(metabolite_arafield2_original$antho_value)
+table(metabolite_arafield3_original$antho_value)
+table(metabolite_arafield4_original$antho_value)
+
+# sort levels
+metabolite_arafield2_original$antho_value <- factor(metabolite_arafield2_original$antho_value, 
+                                                    levels = c("sehr gering", "gering", "mittel", "hoch", "sehr hoch"))
+metabolite_arafield3_original$antho_value <- factor(metabolite_arafield3_original$antho_value, 
+                                                    levels = c("gering", "mittel", "hoch", "sehr hoch"))
+metabolite_arafield4_original$antho_value <- factor(metabolite_arafield4_original$antho_value, 
+                                                    levels = c("sehr gering", "gering", "mittel", "hoch", "sehr hoch"))
+levels(metabolite_arafield4_original$antho_value)
 
 # create english version
-metabolite_arafield2$antho_value_en <- metabolite_arafield2$antho_value
-metabolite_arafield3$antho_value_en <- metabolite_arafield3$antho_value
-metabolite_arafield4$antho_value_en <- metabolite_arafield4$antho_value
-levels(metabolite_arafield2$antho_value_en) <- c("very low", "low", "intermediate", "high", "very high")
-levels(metabolite_arafield3$antho_value_en) <- c("low", "intermediate", "high", "very high")
-levels(metabolite_arafield4$antho_value_en) <- c("very low", "low", "intermediate", "high", "very high")
-table(metabolite_arafield4$antho_value_en)
+metabolite_arafield2_original$antho_value_en <- metabolite_arafield2_original$antho_value
+metabolite_arafield3_original$antho_value_en <- metabolite_arafield3_original$antho_value
+metabolite_arafield4_original$antho_value_en <- metabolite_arafield4_original$antho_value
+
+levels(metabolite_arafield2_original$antho_value_en) <- c("very low", "low", "intermediate", "high", "very high")
+levels(metabolite_arafield3_original$antho_value_en) <- c("low", "intermediate", "high", "very high")
+levels(metabolite_arafield4_original$antho_value_en) <- c("very low", "low", "intermediate", "high", "very high")
+table(metabolite_arafield4_original$antho_value_en)
+```
+
+
+# Define important columns for further analysis
+```{r define important columns for further analysis}
+# change colnames for fumarate in field 3
+colnames(metabolite_arafield3_original)[12:13] <- c("fumarate_neg", "fumarate")
+
+important_columns <- c("versuch_id","accession","plant_name","LT50NAC","LT50ACC","glucose",
+                       "fructose","sucrose","raffinose","amino_acids","malate",
+                       "fumarate","proline","anthoscore","antho_value_en","bbch_id")
+
+metabolite_arafield2 <- metabolite_arafield2_original[,important_columns]
+metabolite_arafield3 <- metabolite_arafield3_original[,important_columns]
+metabolite_arafield4 <- metabolite_arafield4_original[,important_columns]
 ```
 
 
@@ -94,29 +113,27 @@ table(metabolite_arafield4$antho_value_en)
 * wobei NAs beibehalten werden (statt Rang fuer NA zu vergeben)
 
 ```{r ranking BBCH}
-rank_bbch_id2 <- rank(metabolite_arafield2$bbch_id, na.last="keep")    # keep NAs
-rank_bbch_id3 <- rank(metabolite_arafield3$bbch_id, na.last="keep")    # keep NAs
-rank_bbch_id4 <- rank(metabolite_arafield4$bbch_id, na.last="keep")    # keep NAs
+rank_bbch_id2 <- rank(metabolite_arafield2$bbch_id, na.last = "keep")    # keep NAs
+rank_bbch_id3 <- rank(metabolite_arafield3$bbch_id, na.last = "keep")    # keep NAs
+rank_bbch_id4 <- rank(metabolite_arafield4$bbch_id, na.last = "keep")    # keep NAs
 
 # Berechnung des gerankten BBCH in Prozent (Field4: wobei hier Rank 159 Maximum ist, also 100%)
-percent_bbch_id2 <- rank_bbch_id2/max(rank_bbch_id2, na.rm=T)*100
-percent_bbch_id3 <- rank_bbch_id3/max(rank_bbch_id3, na.rm=T)*100
-percent_bbch_id4 <- rank_bbch_id4/max(rank_bbch_id4, na.rm=T)*100
+percent_bbch_id2 <- rank_bbch_id2/max(rank_bbch_id2, na.rm = T)*100
+percent_bbch_id3 <- rank_bbch_id3/max(rank_bbch_id3, na.rm = T)*100
+percent_bbch_id4 <- rank_bbch_id4/max(rank_bbch_id4, na.rm = T)*100
 
 # Anfuegen, Anordnen und Umbennen der Spalten
 metabolite_arafield2 <- data.frame(metabolite_arafield2, 
                                    rank_bbch_id = rank_bbch_id2, 
                                    percent_bbch_id = percent_bbch_id2)
+
 metabolite_arafield3 <- data.frame(metabolite_arafield3, 
                                    rank_bbch_id = rank_bbch_id3, 
                                    percent_bbch_id = percent_bbch_id3)
+
 metabolite_arafield4 <- data.frame(metabolite_arafield4, 
                                    rank_bbch_id = rank_bbch_id4, 
                                    percent_bbch_id = percent_bbch_id4)
-
-metabolite_arafield2 <- (metabolite_arafield2[ , names(metabolite_arafield2)[c(1:16, 24:26, 17:23)]] )
-metabolite_arafield3 <- (metabolite_arafield3[ , names(metabolite_arafield3)[c(1:17, 25:27, 18:24)]] )
-metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1:18, 27:29, 19:26)]] )
 ```
 
 
@@ -149,10 +166,6 @@ norm_bbch_id4 <- (metabolite_arafield4$percent_bbch_id - col0_bbch4) / (c24_bbch
 metabolite_arafield2 <- data.frame(metabolite_arafield2, norm_bbch_id = norm_bbch_id2)
 metabolite_arafield3 <- data.frame(metabolite_arafield3, norm_bbch_id = norm_bbch_id3)
 metabolite_arafield4 <- data.frame(metabolite_arafield4, norm_bbch_id = norm_bbch_id4)
-
-metabolite_arafield2 <- (metabolite_arafield2[ , names(metabolite_arafield2)[c(1:18, 27, 19:26)]] )
-metabolite_arafield3 <- (metabolite_arafield3[ , names(metabolite_arafield3)[c(1:19, 28, 20:27)]] )
-metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1:20, 30, 21:29)]] )
 
 # sinnvoll hier zu skalieren?
 # scale_bbch4=scale(metabolite_arafield4$percent_bbch_id)
@@ -191,11 +204,6 @@ metabolite_arafield4 <- data.frame(metabolite_arafield4,
 # ueberpruefen, ob Kategorien korrekt zugeordnet sind           
 pander(table(metabolite_arafield4$bbch_id, metabolite_arafield4$bbch_categories))
 
-# Anpassung der Spalten-Reihenfolge
-metabolite_arafield2 <- (metabolite_arafield2[ , names(metabolite_arafield2)[c(1:19, 28, 20:27)]] )
-metabolite_arafield3 <- (metabolite_arafield3[ , names(metabolite_arafield3)[c(1:20, 29, 21:28)]] )
-metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1:21, 31, 22:30)]] )
-
 # create english version
 # metabolite_arafield4$bbch_categories_en <- metabolite_arafield4$bbch_categories
 # levels(metabolite_arafield4$bbch_categories_en) <- c("flowering", "generative buds")
@@ -204,47 +212,37 @@ metabolite_arafield4 <- (metabolite_arafield4[ , names(metabolite_arafield4)[c(1
 # table(metabolite_arafield4$bbch_categories_en)
 ```
 
-Note: Ara field trial 4: no plants are in the vegetative stage, only generative buds and flowering
+**Note: Ara field trial 4: no plants are in the vegetative stage, only generative buds and flowering**
 
 # Change negative metabolite values in small positive values 
 * 1/10 of the minimal value
-* Field 2: Columns 6: Glc, 7: Frc, 8: Suc, 9: Raf, 10: Amino acids, 11: Malate, 12: Fumarate, 13: proline
-* Field 3: Columns 6: Glc, 7: Frc, 8: Suc, 9: Raf, 10: Amino acids, 11: Malate, 12: Fumarate, 13: fumarate_withNAs, 14: Proline
-* Field 4 has only one negative value for fumarate
-* Columns 7: Glc, 8: Frc, 9: Suc, 10: Raf, 11: Amino acids, 12: Malate, 13: Fumarate, 14: Proline, 15: Anthocyanin
 
 ```{r change negative values}
-orig.df2 <- metabolite_arafield2[,c(6:13)]
-orig.df3 <- metabolite_arafield3[,c(6:11,13,14)]
-orig.df4 <- metabolite_arafield4[,c(7:15)]
+# define columns which contain metabolite values (without anthocyanins)
+metabolite_columns <- c("glucose", "fructose", "sucrose", "raffinose", 
+                        "amino_acids", "malate", "fumarate", "proline")
 
-nonNeg2 <- as.data.frame(apply(orig.df2, 2, function(col) 
-{
-  min.val <- min(col[col>0])
+orig.df2 <- metabolite_arafield2[,metabolite_columns]
+orig.df3 <- metabolite_arafield3[,metabolite_columns]
+orig.df4 <- metabolite_arafield4[,metabolite_columns]
+
+head(orig.df2)
+
+func_replace_neg_values <- function(col) {
+  min.val <- min(col[col > 0])
   col[col<0] <- (min.val/10)
 	col # Column index
-}))
+	}
 
-nonNeg3 <- as.data.frame(apply(orig.df3, 2, function(col) 
-{
-  min.val <- min(col[col>0])
-  col[col<0] <- (min.val/10)
-	col # Column index
-}))
-
-nonNeg4 <- as.data.frame(apply(orig.df4, 2, function(col) 
-{
-  min.val <- min(col[col>0])
-  col[col<0] <- (min.val/10)
-	col # Column index
-}))
+nonNeg2 <- as.data.frame(apply(orig.df2, 2, func_replace_neg_values))
+nonNeg3 <- as.data.frame(apply(orig.df3, 2, func_replace_neg_values))
+nonNeg4 <- as.data.frame(apply(orig.df4, 2, func_replace_neg_values))
 
 # change column names
-cnames_nonNeg4 <- c("glucose_positive", "fructose_positive", "sucrose_positive",
+nonNeg_colnames <- c("glucose_positive", "fructose_positive", "sucrose_positive",
                     "raffinose_positive", "amino_acids_positive", "malate_positive", 
-                    "fumarate_positive", "proline_positive", "anthocyanin_positive")
-colnames(nonNeg4) <- cnames_nonNeg4
-colnames(nonNeg2) <- colnames(nonNeg3) <- cnames_nonNeg4[-9]
+                    "fumarate_positive", "proline_positive")
+colnames(nonNeg2) <- colnames(nonNeg3) <- colnames(nonNeg4) <- nonNeg_colnames
 
 # attach columns with non-negative values to table
 metabolite_arafield2 <- data.frame(metabolite_arafield2, nonNeg2)
@@ -254,11 +252,10 @@ metabolite_arafield4 <- data.frame(metabolite_arafield4, nonNeg4)
 
 
 # Create a category for flowering and non-flowering plants
-- non-flowering: 0 to 59 
-- flowering: > 60
+* non-flowering: 0 to 59 
+* flowering: > 60
 
 ```{r category flowering and non-flowering plants}
-
 flowering_state_arafield2 <- cut(metabolite_arafield2$bbch_id, breaks=c(0,59,100), ordered=T)
 flowering_state_arafield3 <- cut(metabolite_arafield3$bbch_id, breaks=c(0,59,100), ordered=T)
 flowering_state_arafield4 <- cut(metabolite_arafield4$bbch_id, breaks=c(0,59,100), ordered=T)
@@ -276,8 +273,8 @@ table(metabolite_arafield4$bbch_id, metabolite_arafield4$flowering_state)
 
 
 # Create a category for vegetative and non-vegetative plants
-- vegetative: 0 to 49 
-- non-vegetative: > 50 
+* vegetative: 0 to 49 
+* non-vegetative: > 50 
 ```{r category vegetative and non-vegetative plants}
 vegetative_state_arafield2 <- cut(metabolite_arafield2$bbch_id, breaks=c(0,49,100), ordered=T)
 vegetative_state_arafield3 <- cut(metabolite_arafield3$bbch_id, breaks=c(0,49,100), ordered=T)
@@ -310,45 +307,45 @@ table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)
 
 # Anthocyanin plots and tests
 ```{r anthocyanin plots and tests, warning=FALSE}
-# pdf(file="Masterarbeit/Ergebnisse/AraField4_Assocplot.pdf", 5,5)
-assocplot(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[ ,c(2:3)], 
-          col=c("black","red"), xlab="Anthocyan-Gehalt (visuelle Skala)", ylab="BBCH-Kategorie")
-# flaechenproportionale Darstellung der Abweichungen
-# Veranschaulichung, ob einzelne Werte groeßer oder kleiner als erwartet waren
-# Direkte Analyse der Residuen (Residuals)
-
-assocplot(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$flowering_state), 
-          col=c("black","red"), xlab="Anthocyan-Gehalt (visuelle Skala)", 
-          ylab="BBCH-Kategorie", main="Feldversuch 2009/10")
-
-boxplot(metabolite_arafield4$anthoscore ~ metabolite_arafield4$bbch_categories, 
-        main="Anthocyan-Gehalt bei verschiedenen BBCH-Kategorien", xlab="BBCH-Kategorie",
-        ylab="Anthocyan-Gehalt (visuelle Skala)", cex.main=1.5, cex.axis=1.3, cex.lab=1.3)
-#dev.off()
-
-# col=c("#9ACD32","#B02B76")
-
-# Nullhypothese: (Two or More) Groups are not different from each other regarding their population proportions or means
-# P-Value: gives the probability that the null hypothesis is true!
-        # Tells you how often you would get the observed difference by random sampling from two populations if the means/proportions would be equal
-        # Tells you not(!!) how sure we are that there is really a difference
-
-
-prop.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
-
-pairwise.prop.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
-
-chisq.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
-
-# Ausgabe der erwarteten Werte
-chisq.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])$expected
-
-###### bei Anzahl erwarteter Werte N<5 Verwendung des Fisher.test !!! ########
-# --> siehe Dormann: Angewandte Statistik fuer die biologischen Wissenschaften, Seite 51
-
-fisher.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
-
-# signifikanter Unterschied
+# # pdf(file="Masterarbeit/Ergebnisse/AraField4_Assocplot.pdf", 5,5)
+# assocplot(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[ ,c(2:3)], 
+#           col=c("black","red"), xlab="Anthocyan-Gehalt (visuelle Skala)", ylab="BBCH-Kategorie")
+# # flaechenproportionale Darstellung der Abweichungen
+# # Veranschaulichung, ob einzelne Werte groeßer oder kleiner als erwartet waren
+# # Direkte Analyse der Residuen (Residuals)
+# 
+# assocplot(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$flowering_state), 
+#           col=c("black","red"), xlab="Anthocyan-Gehalt (visuelle Skala)", 
+#           ylab="BBCH-Kategorie", main="Feldversuch 2009/10")
+# 
+# boxplot(metabolite_arafield4$anthoscore ~ metabolite_arafield4$bbch_categories, 
+#         main="Anthocyan-Gehalt bei verschiedenen BBCH-Kategorien", xlab="BBCH-Kategorie",
+#         ylab="Anthocyan-Gehalt (visuelle Skala)", cex.main=1.5, cex.axis=1.3, cex.lab=1.3)
+# #dev.off()
+# 
+# # col=c("#9ACD32","#B02B76")
+# 
+# # Nullhypothese: (Two or More) Groups are not different from each other regarding their population proportions or means
+# # P-Value: gives the probability that the null hypothesis is true!
+#         # Tells you how often you would get the observed difference by random sampling from two populations if the means/proportions would be equal
+#         # Tells you not(!!) how sure we are that there is really a difference
+# 
+# 
+# prop.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
+# 
+# pairwise.prop.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
+# 
+# chisq.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
+# 
+# # Ausgabe der erwarteten Werte
+# chisq.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])$expected
+# 
+# ###### bei Anzahl erwarteter Werte N<5 Verwendung des Fisher.test !!! ########
+# # --> siehe Dormann: Angewandte Statistik fuer die biologischen Wissenschaften, Seite 51
+# 
+# fisher.test(table(metabolite_arafield4$antho_value_en, metabolite_arafield4$bbch_categories)[,c(2:3)])
+# 
+# # signifikanter Unterschied
 ```
 
 
@@ -409,5 +406,6 @@ und werden jetzt mittels linearer Regression geschaetzt
 # Save workspace
 ```{r save workspace}
 save.image("metabolite_arafield.RData")
+sessionInfo()
 ```
 
