@@ -28,6 +28,8 @@ library(pander)
 library(ggplot2)
 library(lattice)
 library(gplots)
+library(pcaMethods)
+library(plyr)
 
 trellis.device() # zuruecksetzen auf default
 show.settings() # Farbeinstellungen usw. anzeigen
@@ -686,35 +688,45 @@ metabolite_arafield_all <- rbind(metabolite_arafield2[,combined_colnames],
                                  metabolite_arafield4[,combined_colnames]) 
 dim(metabolite_arafield_all)
 
-# modify factor for field trial
-table(metabolite_arafield_all$versuch_id)
-metabolite_arafield_all$versuch_id <- factor(metabolite_arafield_all$versuch_id, 
-                                             levels = c("43", "105", "119"))
-levels(metabolite_arafield_all$versuch_id) <- c("field2", "field3", "field4")
-
 # transformed values
 metabolite_arafield_allT <- rbind(metabolite_arafield2[,combined_colnamesT],
                                   metabolite_arafield3[,combined_colnamesT],
                                   metabolite_arafield4[,combined_colnamesT]) 
+
+
+# modify factor for field trial
+table(metabolite_arafield_all$versuch_id)
+table(metabolite_arafield_allT$versuch_id)
+
+metabolite_arafield_all$versuch_id <- factor(metabolite_arafield_all$versuch_id, 
+                                             levels = c("43", "105", "119"))
+metabolite_arafield_allT$versuch_id <- factor(metabolite_arafield_allT$versuch_id, 
+                                             levels = c("43", "105", "119"))
+
+levels(metabolite_arafield_all$versuch_id) <- c("field2", "field3", "field4")
+levels(metabolite_arafield_allT$versuch_id) <- c("field2", "field3", "field4")
 ```
 
 ## Aggregate and scale all data
++ scaling means: columns (= metabolites) are scaled to mean of zero and sd of 1 (over all samples/rows)
 ```{r aggregate and scale}
 # scale (per column = metabolite)
 metabolite_arafield_all_scaled <- scale(metabolite_arafield_all[,3:10])
 dim(metabolite_arafield_all)
 dim(metabolite_arafield_all_scaled)
 # 416 8
+rownames(metabolite_arafield_all_scaled) <- metabolite_arafield_all$accession
 
 # aggregate
 metabolite_arafield_agg <- aggregate(metabolite_arafield_all[,3:10], 
                                      by = list(metabolite_arafield_all$accession,
                                                metabolite_arafield_all$versuch_id), mean)
 
+# scale aggregated data
 metabolite_arafield_agg_scaled <- scale(metabolite_arafield_agg[,3:10])
 dim(metabolite_arafield_agg_scaled)
 # 203 8
-rownames(metabolite_arafield_agg_scaled) <- metabolite_arafield_agg$Group.1
+rownames(metabolite_arafield_agg_scaled) <- metabolite_arafield_agg$Group.1 # accessions
 ```
 
 ## Heatmap
@@ -735,21 +747,84 @@ my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 299)
 
 heatmap.2(t(as.matrix(metabolite_arafield_all_scaled)), 
           trace = "none", col = my_palette, breaks = colors,
-          Colv = FALSE, main = "scaled data (no clustering)")
+          symkey = F, Colv = FALSE, dendrogram = "row",
+          main = "scaled data (no clustering)", 
+          ColSideColors = cols_trials[f], na.color = "grey")
 
 heatmap.2(t(as.matrix(metabolite_arafield_all_scaled)), 
           trace = "none", col = my_palette, breaks = colors,
           main = "scaled data", ColSideColors = cols_trials[f], 
+          symkey = F, na.color = "grey")
+
+heatmap.2(t(as.matrix(metabolite_arafield_agg_scaled)), 
+          trace = "none", col = my_palette, breaks = colors, 
+          symkey = F, Colv = FALSE, dendrogram = "row",
+          main = "aggregated & scaled data (no clustering)",
           na.color = "grey")
 
 heatmap.2(t(as.matrix(metabolite_arafield_agg_scaled)), 
           trace = "none", col = my_palette, breaks = colors,
-          Colv = FALSE, main = "aggregated & scaled data (no clustering)")
+          symkey = F, main = "aggregated & scaled data",
+          ColSideColors = cols_trials[f_agg], na.color = "grey")
 
-heatmap.2(t(as.matrix(metabolite_arafield_agg_scaled)), 
+pdf("figures/Metabolite_AraField_Heatmap_agg_scaled.pdf", width=7, height=12)
+heatmap.2(as.matrix(metabolite_arafield_agg_scaled), 
           trace = "none", col = my_palette, breaks = colors,
-          main = "aggregated & scaled data",
-          ColSideColors = cols_trials[f_agg])
+          symkey = F, main = "aggregated & scaled data", cexRow = 0.5,
+          RowSideColors = cols_trials[f_agg], na.color = "grey")
+dev.off()
+```
+
+
+## PCA
+```{r PCA}
+# aggregated scaled
+pca_data_agg_scaled <- prep(metabolite_arafield_agg_scaled, scale = "none")
+dim(pca_data_agg_scaled)
+pca_res_agg_scaled <- pca(pca_data_agg_scaled, method = "rnipals", nPcs = 5)
+
+plot(pca_res_agg_scaled@scores[,1], pca_res_agg_scaled@scores[,2], col = cols_trials[f_agg], pch = 19)
+legend("topleft", fill = cols_trials, c("field2", "field3", "field4"))
+
+metabolite_arafield_agg_scaled_lt50 <- merge(metabolite_arafield_agg_scaled, lt50, 
+                                             by.x = "row.names", by.y = "Accession", all = TRUE)
+
+# Colour points in a plot differently depending on a vector of values
+# http://stackoverflow.com/questions/9946630/colour-points-in-a-plot-differently-depending-on-a-vector-of-values
+rbPal <- colorRampPalette(c('red','blue'))
+metabolite_arafield_agg_scaled_lt50$Color_ACC <- rbPal(10)[as.numeric(cut(metabolite_arafield_agg_scaled_lt50$LT50ACC,breaks = 10))]
+
+plot(pca_res_agg_scaled@scores[,1], pca_res_agg_scaled@scores[,2], col = metabolite_arafield_agg_scaled_lt50$Color_ACC, pch = 19)
+
+
+
+# All scaled
+pca_data_all_scaled <- prep(metabolite_arafield_all_scaled, scale = "none")
+dim(pca_data_all_scaled)
+pca_res_all_scaled <- pca(pca_data_all_scaled, method = "rnipals", nPcs = 5)
+
+plot(pca_res_all_scaled@scores[,1], pca_res_all_scaled@scores[,2], col = cols_trials[f], pch = 19)
+legend("topleft", fill = cols_trials, c("field2", "field3", "field4"))
+
+metabolite_arafield_all_scaled_lt50 <- merge(metabolite_arafield_all_scaled, lt50, 
+                                             by.x = "row.names", by.y = "Accession", all = TRUE)
+
+# Colour points in a plot differently depending on a vector of values
+# http://stackoverflow.com/questions/9946630/colour-points-in-a-plot-differently-depending-on-a-vector-of-values
+rbPal <- colorRampPalette(c('red','blue'))
+metabolite_arafield_all_scaled_lt50$Color_ACC <- rbPal(10)[as.numeric(cut(metabolite_arafield_all_scaled_lt50$LT50ACC,breaks = 10))]
+
+plot(pca_res_all_scaled@scores[,1], pca_res_all_scaled@scores[,2], col = metabolite_arafield_all_scaled_lt50$Color_ACC, pch = 19)
+
+# original data
+pca_data_all <- prep(metabolite_arafield_all[,3:10], scale = "none")
+dim(pca_data_all)
+pca_res_all <- pca(pca_data_all, method = "rnipals", nPcs = 5)
+
+plot(pca_res_all@scores[,1], pca_res_all@scores[,2], col = cols_trials[f], pch = 19)
+legend("topleft", fill = cols_trials, c("field2", "field3", "field4"))
+
+plot(pca_res_all@scores[,1], pca_res_all@scores[,2], col = metabolite_arafield_all_scaled_lt50$Color_ACC, pch = 19)
 ```
 
 
