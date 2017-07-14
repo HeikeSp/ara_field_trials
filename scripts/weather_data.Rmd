@@ -1,17 +1,25 @@
 ---
-title: "Weather Data"
+title: "Weatger data of Arabidopsis field trials"
 author: "Heike Sprenger"
-date: "Tuesday, May 05, 2015"
-output: html_document
+date: "Monday, July 10, 2017"
+output:
+  html_document:
+    highlight: tango
+    number_section: yes
+    theme: cerulean
+    toc: yes
+    toc_float: true
+    toc_depth: 4
 ---
 
-### Set working directory  
+# Set working directory  
 ```{r set working directory}
 #getwd()
-setwd("D:/work/repos/ara_field_trials/")
+#setwd("D:/work/repos/ara_field_trials/")
+setwd("X:/mpimp/repos/ara_field_trials/")
 ```
 
-### Load workspace, packages and scripts
+# Load workspace, packages and scripts
 ```{r load workspace}
 # load packages
 library(knitr)
@@ -23,16 +31,16 @@ opts_chunk$set(fig.width=10, fig.height=5)
 opts_knit$set(root.dir = '../')
 
 # load workspace
-load("weather_data.RData")
+#load("weather_data.RData")
 ```
 
-### Load weather data
+# Load weather data
 ```{r load weather data}
-wetter=read.table("data/WetterR.txt", header=TRUE, sep="\t")
+wetter <- read.table("data/WetterR.txt", header=TRUE, sep="\t")
 pander(head(wetter))
 ```
 
-
+## Date format
 ```{r date format}
 ## Umwandeln des Faktors in eine Zeichenkette
 class(wetter$Datum)
@@ -42,7 +50,7 @@ class(Date)
 head(Date)
 
 ## Umwandeln der Zeichenkette fuer Date_Time in POSIX Format
-Date_converted = strptime(Date, "%d.%m.%Y")
+Date_converted <- strptime(Date, "%d.%m.%Y")
 class(Date_converted)
 
 ## komplette Zeitangabe
@@ -52,7 +60,7 @@ head(Date_converted)
 head(as.Date(Date_converted)) 
 ```
 
-
+## Subsets per year
 ```{r subsets per year}
 wetter_feld2 <- subset(wetter, wetter$Feld=="Feld2")
 wetter_feld3 <- subset(wetter, wetter$Feld=="Feld3")
@@ -69,10 +77,21 @@ wetter_feld3 <- cbind(wetter_feld3, Date = Date_feld3)
 wetter_feld4 <- cbind(wetter_feld4, Date = Date_feld4)
 ```
 
+## reformat date
+```{r reformat date}
+wetter_feld2$Date2 <- as.Date(wetter_feld2$Date, "%Y-%m-%d")
+wetter$Date2 <- as.Date(wetter$Date, "%Y-%m-%d")
+class(wetter$Date2)
+wetter$Feld_Name <- wetter$Feld
+levels(wetter$Feld_Name) <- c("Field 2007/08", "Field 2008/09", "Field 2009/10")
 
-### Temperature
+wetter$DayOfYear <- as.numeric(format(wetter$Date2, "%j"))
+wetter$CommonDate <- as.Date(paste0("2000-",format(wetter$Date2, "%j")), "%Y-%j")
+```
 
-#### plot
+
+# Temperature
+## plot
 ```{r temperature plot}
 plot(Date_converted, wetter$Temp, type="n", main="temperature", xaxt="n", xlab="", ylab="temperature")
 
@@ -93,7 +112,7 @@ abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
 abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
 ```
 
-
+## ggplot2
 ```{r temperature ggplot2}
 ggplot(wetter_feld2, aes(Date, Temp)) + geom_line() + xlab("") + ylab("Temperature")
 
@@ -103,11 +122,37 @@ ggplot(wetter_feld2, aes(Date, Temp)) + geom_line(data=wetter_feld2, aes(color="
   geom_line(data=wetter_feld4, aes(color="Field 4")) +
   labs(color="Field trial") 
 
-qplot(Date, Temp, data = wetter, geom = "line", group = Feld) + facet_grid(Feld ~ .) + scale_x_date(labels = date_format("%b"))
+ggplot(wetter_feld2, aes(Date2, Temp)) + 
+  geom_line() + 
+  scale_x_date(date_breaks = "1 month", date_labels = "%Y-%b") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+qplot(Date2, Temp, data = wetter, geom = "line", group = Feld) + 
+  facet_grid(Feld ~ .) + 
+  scale_x_date(date_breaks = "1 month", date_labels = "%B")
+  
+# looks fine:
+temp_plot <- ggplot(wetter, aes(x = Date2, y = Temp, group = Feld)) + 
+  geom_line() +
+  facet_wrap(~ Feld_Name, scales="free_x") + 
+  scale_x_date(date_breaks = "1 month", date_labels = "%Y-%b") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  geom_hline(aes(yintercept=0), colour="#BB0000") + 
+  ylab("Temperature (°C)") + xlab("Date")
+
+pdf("figures/weather_temp.pdf", width = 10, height = 5)
+print(temp_plot)
+dev.off()
+
+ppi <- 400
+png("figures/weather_temp.png", width = 10*ppi, height = 5*ppi, res = ppi)
+print(temp_plot)
+dev.off()
 ```
 
 
-#### test for signifcant differences between years
+## test for signifcant differences between years
 ```{r temperature t.test}
 ############## Temperatur ################
 # Oktober bis April
@@ -132,9 +177,8 @@ t.test(wetter$Temp[wetter$Feld=="Feld3"][62:151], wetter$Temp[wetter$Feld=="Feld
 ```
 
 
-### Snow depth
-
-#### plot
+# Snow depth
+## plot
 ```{r snow depth plot}
 # plot(Date_converted, wetter$Schnee, type="n", main="snow depth", xaxt="n", xlab="", ylab="snow depth")
 # 
@@ -170,8 +214,27 @@ abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
 abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
 ```
 
+## ggplot2
+```{r snow depth ggplot2}
+snow_depth_plot <- ggplot(wetter, aes(x = Date2, y = Schnee, group = Feld)) + 
+  geom_bar(stat = "identity", fill = "black") +
+  facet_wrap(~ Feld_Name, scales="free_x") + 
+  scale_x_date(date_breaks = "1 month", date_labels = "%Y-%b") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Snow depth (cm)") + xlab("Date")
 
-#### test for signifcant differences between years
+pdf("figures/weather_snow_depth.pdf", width = 10, height = 5)
+print(snow_depth_plot)
+dev.off()
+
+ppi <- 400
+png("figures/weather_snow_depth.png", width = 10*ppi, height = 5*ppi, res = ppi)
+print(snow_depth_plot)
+dev.off()
+```
+
+
+## test for signifcant differences between years
 ```{r snow depth t-test}
 # pdf("figures/SnowDepth.pdf", height=16, width=12)
 # par(mfrow=c(2,1))
@@ -190,9 +253,9 @@ t.test(wetter$Schnee[wetter$Feld=="Feld3"], wetter$Schnee[wetter$Feld=="Feld4"])
 ```
 
 
-### Sunshine
+# Sunshine
 
-#### plot
+## plot
 ```{r sunshine plot}
 # plot(Date_converted, wetter$Sonne, type="n", main="temperature", xaxt="n", xlab="", ylab="temperature")
 # 
@@ -222,7 +285,27 @@ abline(v=as.numeric(Date_feld4[1]), lty=2, col='grey')
 abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
 ```
 
-#### test for signifcant differences between years
+## ggplot2
+```{r sunshine ggplot2}
+sunshine_plot <- ggplot(wetter, aes(x = Date2, y = Sonne, group = Feld)) + 
+  geom_bar(stat = "identity",  fill = "black") +
+  facet_wrap(~ Feld_Name, scales="free_x") + 
+  scale_x_date(date_breaks = "1 month", date_labels = "%Y-%b") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Sunshine duration (min)") + xlab("Date")
+
+pdf("figures/weather_sunshine.pdf", width = 10, height = 5)
+print(sunshine_plot)
+dev.off()
+
+ppi <- 400
+png("figures/weather_sunshine.png", width = 10*ppi, height = 5*ppi, res = ppi)
+print(sunshine_plot)
+dev.off()
+```
+
+
+## test for signifcant differences between years
 ```{r sunshine t-test}
 
 # Oktober bis April
@@ -247,7 +330,7 @@ t.test(wetter$Sonne[wetter$Feld=="Feld3"][62:151], wetter$Sonne[wetter$Feld=="Fe
 ```
 
 
-## save workspace
+# save workspace
 ```{r save workspace}
 save.image("weather_data.RData")
 ```
