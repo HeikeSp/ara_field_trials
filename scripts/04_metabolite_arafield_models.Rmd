@@ -417,23 +417,35 @@ CVlm(data = field4_DAAGdata, form.lm = field4_regressionACC, m = 5) # Overall ms
 # training data
 field2_loocv <- CVlm(data = field2_DAAGdata, form.lm = field2_regressionACC, m = 76, printit = F)
 attr(field2_loocv, "ms") # Overall ms: 3.19
+plot(field2_loocv$LT50ACC, field2_loocv$cvpred)
+
 
 field3_loocv <- CVlm(data = field3_DAAGdata, form.lm = field3_regressionACC, m = 97, printit = F)
 attr(field3_loocv, "ms") # Overall ms: 2.64
+plot(field3_loocv$LT50ACC, field3_loocv$cvpred)
+
 
 field4_loocv <- CVlm(data = field4_DAAGdata, form.lm = field4_regressionACC, m = 109, printit = F)
 attr(field4_loocv, "ms") # Overall ms: 2.31
+cor.test(field4_loocv$LT50ACC, field4_loocv$cvpred)
+plot(field4_loocv$LT50ACC, field4_loocv$Predicted)
+#field4_loocv$Predicted equals field4_regressionACC$fitted.values
 
 
 # ALL data
 field2_all_loocv <- CVlm(data = field2_DAAGdata_all, form.lm = field2_regressionACC_all, m = 87, printit = F)
 attr(field2_all_loocv, "ms") # Overall ms: 2.89
+plot(field2_all_loocv$LT50ACC, field2_all_loocv$cvpred)
 
 field3_all_loocv <- CVlm(data = field3_DAAGdata_all, form.lm = field3_regressionACC_all, m = 114, printit = F)
 attr(field3_all_loocv, "ms") # Overall ms: 2.55
+plot(field3_all_loocv$LT50ACC, field3_all_loocv$cvpred)
+abline(0,1)
 
 field4_all_loocv <- CVlm(data = field4_DAAGdata_all, form.lm = field4_regressionACC_all, m = 135, printit = F)
 attr(field4_all_loocv, "ms") # Overall ms: 2.19
+plot(field4_all_loocv$LT50ACC, field4_all_loocv$cvpred)
+abline(0,1)
 ```
 
 
