@@ -17,6 +17,7 @@ output:
 #getwd()
 #setwd("D:/work/repos/ara_field_trials/")
 #setwd("~/work/repos/ara_field_trials/")
+setwd("X:/mpimp/repos/ara_field_trials")
 ```
 
 # Load workspace, packages and scripts
@@ -38,7 +39,7 @@ opts_knit$set(root.dir = '../')
 ```{r load data, tidy=TRUE}
 metabolite_arafield2_all <- read.table("data/Metabolite_AraField2.txt", header=TRUE, sep="\t")
 metabolite_arafield2_original <- read.table("data/Metabolite_AraField2_ohneMissingValues.txt", header=TRUE, sep="\t")
-metabolite_arafield3_original <- read.table("data/Metabolite_AraField3.txt", header=TRUE, sep="\t")
+metabolite_arafield3_original <- read.table("data/Metabolite_AraField3_new.txt", header=TRUE, sep="\t")
 metabolite_arafield4_original <- read.table("data/Metabolite_AraField4.txt", header=TRUE, sep="\t")
 
 dim(metabolite_arafield2_all)
@@ -94,7 +95,8 @@ table(metabolite_arafield4_original$antho_value_en)
 # Define important columns for further analysis
 ```{r define important columns for further analysis}
 # change colnames for fumarate in field 3
-colnames(metabolite_arafield3_original)[12:13] <- c("fumarate_neg", "fumarate")
+colnames(metabolite_arafield3_original)[12:14] <- c("fumarate_neg", "fumarate_withNAs", "fumarate")
+# use the repeated measurement of fumarate from arafield3 (column 14)!
 
 important_columns <- c("versuch_id","accession","plant_name","LT50NAC","LT50ACC","glucose",
                        "fructose","sucrose","raffinose","amino_acids","malate",
