@@ -2,6 +2,7 @@
 .Rhistory
 *.RData
 *.xlsx
+*.docx
 *.ppt
 *.tsv
 *.tsv.gz
