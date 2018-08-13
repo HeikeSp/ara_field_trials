@@ -30,6 +30,7 @@ library(leaps)
 library(faraway)
 library(MASS)
 library(glmnet)
+library(caret)
 
 # set options for knitr
 opts_chunk$set(fig.width=6, fig.height=5, tidy=TRUE, tidy.opts=list(width.cutoff=70))
@@ -87,7 +88,8 @@ length(intersect(field3$accession, lt50$Accession))
 length(intersect(field4$accession, lt50$Accession))
 ```
 
-## set factor levels correctly
+
+## Set factor levels correctly
 ```{r set factor levels correctly}
 # antho score (en)
 field2$antho_value_en <- factor(field2$antho_value_en, 
@@ -136,6 +138,30 @@ dim(field4)
 ```
 
 
+## Standardize metabolite levels
+```{r standardize metabolite levels}
+hist(field4$proline_positive)
+hist(field4$prolineT)
+hist(scale(field4$prolineT))
+
+field2_scaled <- data.frame(field2[,c("accession", "plant_name", "LT50ACC", "LT50NAC", 
+                                      "capacity", "bbch_id", "anthoscore")],
+                            scale(field2[,c("glucoseT","fructoseT","sucroseT","raffinoseT",
+                                            "amino_acidsT","malateT","fumarateT","prolineT")]))
+
+field3_scaled <- data.frame(field3[,c("accession", "plant_name", "LT50ACC", "LT50NAC", 
+                                      "capacity", "bbch_id", "anthoscore")],
+                            scale(field3[,c("glucoseT","fructoseT","sucroseT","raffinoseT",
+                                            "amino_acidsT","malateT","fumarateT","prolineT")]))
+
+field4_scaled <- data.frame(field4[,c("accession", "plant_name", "LT50ACC", "LT50NAC", 
+                                      "capacity", "bbch_id", "anthoscore")],
+                            scale(field4[,c("glucoseT","fructoseT","sucroseT","raffinoseT",
+                                            "amino_acidsT","malateT","fumarateT","prolineT")]))
+```
+
+
+
 # Define data for modeling
 ## Define training and test accessions
 ```{r define training and test accessions}
@@ -162,7 +188,6 @@ idx_unknown3 <- which(field3$accession %in% accessions_unknown)
 idx_unknown4 <- which(field4$accession %in% accessions_unknown)
 ```
 
-
 ## Define colnames
 ```{r define colnames}
 # with original BBCH
@@ -185,15 +210,23 @@ model_colnames_norm <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "capac
 
 model_colnames_short <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "cap",
                           "glc","frc","suc","raf","aa","mal","fum","pro","bbch","anthoscore")
+
+# transformed and scaled variables
+model_colnamesT <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "capacity",
+                    "glucoseT", "fructoseT", "sucroseT","raffinoseT", "amino_acidsT", 
+                    "malateT", "fumarateT", "prolineT", "bbch_id", "anthoscore")
 ```
 
 
-### subset for model training/testing
+### Subset for model training/testing
 ```{r subset for model training/testing}
 # training set
 field2_train <- field2[idx_train2, model_colnames]
 field3_train <- field3[idx_train3, model_colnames]
 field4_train <- field4[idx_train4, model_colnames]
+field2_trainT <- field2_scaled[idx_train2, model_colnamesT]
+field3_trainT <- field3_scaled[idx_train3, model_colnamesT]
+field4_trainT <- field4_scaled[idx_train4, model_colnamesT]
 field2_train_norm <- field2[idx_train2, model_colnames_norm]
 field3_train_norm <- field3[idx_train3, model_colnames_norm]
 field4_train_norm <- field4[idx_train4, model_colnames_norm]
@@ -202,6 +235,9 @@ field4_train_norm <- field4[idx_train4, model_colnames_norm]
 field2_test <- field2[idx_test2, model_colnames]
 field3_test <- field3[idx_test3, model_colnames]
 field4_test <- field4[idx_test4, model_colnames]
+field2_testT <- field2_scaled[idx_test2, model_colnamesT]
+field3_testT <- field3_scaled[idx_test3, model_colnamesT]
+field4_testT <- field4_scaled[idx_test4, model_colnamesT]
 field2_test_norm <- field2[idx_test2, model_colnames_norm]
 field3_test_norm <- field3[idx_test3, model_colnames_norm]
 field4_test_norm <- field4[idx_test4, model_colnames_norm]
@@ -240,6 +276,42 @@ length(unique(field4_test$accession)) # 12
 ```
 
 
+## Data splitting NEW
+```{r data splitting NEW}
+n_obs <- nrow(lt50) # 64
+source("../functions/func_get_splits.R")
+set.seed(1234)
+folds <- func_get_splits(seq = sample(1:n_obs), num = 8)
+
+folds_acc <- folds
+
+for(i in 1:8){
+  for(j in 1:8){
+    folds_acc[i,j] <- as.character(lt50$Accession)[folds[i,j]]
+  }
+}
+
+# trainsets will be a list of 8 dataframes
+x_f4_train <- x_f4_test <- y_f4_train <- y_f4_test <- list()
+
+for(i in 1:8){
+  idx_train4 <- which(field4$accession %in% c(folds_acc[-i,]))
+  idx_test4 <- which(field4$accession %in% folds_acc[i,])
+  
+  x_f4_train[[i]] <- field4[idx_train4, model_colnames[6:15]]
+  x_f4_test[[i]] <- field4[idx_test4, model_colnames[6:15]]
+  y_f4_train[[i]] <- field4[idx_train4, "LT50ACC"]
+  y_f4_test[[i]] <- field4[idx_test4, "LT50ACC"]
+}
+
+dim(f4_train[[1]])
+# 119 rows = observations, 15 columns
+
+dim(f4_test[[1]])
+# 16 rows = observations, 15 columns
+```
+
+
 ## Define freezing tolerance per trial
 ```{r define freezing tolerance per trial}
 # field2_train_LT50ACC <- field2_train$LT50ACC
@@ -263,11 +335,15 @@ length(unique(field4_test$accession)) # 12
 colnames(field2_train) <- colnames(field3_train) <- colnames(field4_train) <- model_colnames_short
 # using NORMALIZED BBCH
 colnames(field2_train_norm) <- colnames(field3_train_norm) <- colnames(field4_train_norm) <- model_colnames_short
+# transformed and scaled data
+colnames(field2_trainT) <- colnames(field3_trainT) <- colnames(field4_trainT) <- model_colnames_short
 
 # test data
 colnames(field2_test) <- colnames(field3_test) <- colnames(field4_test) <- model_colnames_short
 # using NORMALIZED BBCH
 colnames(field2_test_norm) <- colnames(field3_test_norm) <- colnames(field4_test_norm) <- model_colnames_short
+# transformed and scaled data
+colnames(field2_testT) <- colnames(field3_testT) <- colnames(field4_testT) <- model_colnames_short
 
 # all accessions
 colnames(field2_all) <- colnames(field3_all) <- colnames(field4_all) <- model_colnames_short
@@ -352,6 +428,35 @@ summary(field4_regressionACC_factor)$r.squared # 0.431
 summary(field4_regressionACC_factor)$adj.r.squared # Adjusted R-squared: 0.301
 
 ## --> identical to model with factor of normalized scores
+```
+
+## Use transformed and scaled data (without factor)
+```{r regACC transformed and scaled data}
+field2T_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                               bbch + anthoscore, data = field2_trainT)
+field3T_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                bbch + anthoscore, data = field3_trainT)
+field4T_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                bbch + anthoscore, data = field4_trainT)
+
+summary(field2T_regressionACC)$r.squared # 0.377
+summary(field3T_regressionACC)$r.squared # 0.273
+summary(field4T_regressionACC)$r.squared # 0.399
+```
+
+
+## Use transformed and scaled data (with factor)
+```{r regACC transformed and scaled data - with factor}
+field2T_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                     factor(bbch) + factor(anthoscore), data = field2_trainT)
+field3T_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                     factor(bbch) + factor(anthoscore), data = field3_trainT)
+field4T_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                     factor(bbch) + factor(anthoscore), data = field4_trainT)
+
+summary(field2T_regressionACC_factor)$r.squared # 0.481
+summary(field3T_regressionACC_factor)$r.squared # 0.350
+summary(field4T_regressionACC_factor)$r.squared # 0.428
 ```
 
 
@@ -513,6 +618,14 @@ field2_predictionACC <- predict(field2_regressionACC, field2_test[,6:15])
 field3_predictionACC <- predict(field3_regressionACC, field3_test[,6:15])
 field4_predictionACC <- predict(field4_regressionACC, field4_test[,6:15])
 
+field2T_predictionACC <- predict(field2T_regressionACC, field2_testT[,6:15])
+field3T_predictionACC <- predict(field3T_regressionACC, field3_testT[,6:15])
+field4T_predictionACC <- predict(field4T_regressionACC, field4_testT[,6:15])
+
+field2T_predictionACC_factor <- predict(field2T_regressionACC_factor, field2_testT[,6:15])
+field3T_predictionACC_factor <- predict(field3T_regressionACC_factor, field3_testT[,6:15])
+field4T_predictionACC_factor <- predict(field4T_regressionACC_factor, field4_testT[,6:15])
+
 field2_predictionACC_factor <- predict(field2_regressionACC_factor, field2_test[,6:15])
 field3_predictionACC_factor <- predict(field3_regressionACC_factor, field3_test[,6:15])
 field4_predictionACC_factor <- predict(field4_regressionACC_factor, field4_test[,6:15])
@@ -560,18 +673,22 @@ write.table(field4_predictionACC_table, "output/field4_predictionACC.txt", sep="
 ```{r correlation of predicted and measured LT50ACC for test data}
 # field 2
 cor(field2_test$LT50ACC, field2_predictionACC)
+cor(field2_test$LT50ACC, field2T_predictionACC)
+cor(field2_test$LT50ACC, field2T_predictionACC_factor)
 cor(field2_test$LT50ACC, field2_predictionACC_factor)
 cor(field2_test$LT50ACC, field2_predictionACC_norm)
 cor(field2_test$LT50ACC, field2_predictionACC_norm_factor)
 
 # field 3
 cor(field3_test$LT50ACC, field3_predictionACC)
+cor(field3_test$LT50ACC, field3T_predictionACC_factor)
 cor(field3_test$LT50ACC, field3_predictionACC_factor)
 cor(field3_test$LT50ACC, field3_predictionACC_norm)
 cor(field3_test$LT50ACC, field3_predictionACC_norm_factor)
 
 # field 4
 cor(field4_test$LT50ACC, field4_predictionACC)
+cor(field4_test$LT50ACC, field4T_predictionACC_factor)
 cor(field4_test$LT50ACC, field4_predictionACC_factor)
 cor(field4_test$LT50ACC, field4_predictionACC_norm)
 cor(field4_test$LT50ACC, field4_predictionACC_norm_factor)
@@ -658,6 +775,15 @@ summary(field4_regressionACC_factor)
 anova(field2_regressionACC_factor)
 anova(field3_regressionACC_factor)
 anova(field4_regressionACC_factor)
+
+# scaled and transformed data
+summary(field2T_regressionACC_factor)
+summary(field3T_regressionACC_factor)
+summary(field4T_regressionACC_factor)
+
+anova(field2T_regressionACC_factor)
+anova(field3T_regressionACC_factor)
+anova(field4T_regressionACC_factor)
 ```
 
 
@@ -699,6 +825,23 @@ field3_lasso_ACC <- glmnet(x,y)
 # Cross-validation
 set.seed(1)
 field3_lasso_cv_ACC <- cv.glmnet(x, y)
+
+# compare different alpha values
+set.seed(1)
+field3_lasso_cv_ACC1 <- cv.glmnet(x, y, alpha=1)
+set.seed(1)
+field3_lasso_cv_ACC.5 <- cv.glmnet(x, y, alpha=0.5)
+set.seed(1)
+field3_lasso_cv_ACC0 <- cv.glmnet(x, y, alpha=0)
+plot(field3_lasso_cv_ACC1)
+plot(field3_lasso_cv_ACC.5)
+plot(field3_lasso_cv_ACC0)
+plot(log(field3_lasso_cv_ACC1$lambda),field3_lasso_cv_ACC1$cvm,pch=19,
+     col="red",xlab="log(Lambda)",ylab=field3_lasso_cv_ACC1$name, 
+     xlim = c(-6,6), ylim = c(2.5,3.1))
+points(log(field3_lasso_cv_ACC.5$lambda),field3_lasso_cv_ACC.5$cvm,pch=19,col="grey")
+points(log(field3_lasso_cv_ACC0$lambda),field3_lasso_cv_ACC0$cvm,pch=19,col="blue")
+legend("topleft",legend=c("alpha= 1","alpha= .5","alpha 0"),pch=19,col=c("red","grey","blue"))
 
 # use no specific lambda
 field3_lasso_ACC_pred_test <- predict(field3_lasso_ACC, new = test_x)
@@ -752,6 +895,24 @@ field4_lasso_ACC <- glmnet(x,y)
 set.seed(1)
 field4_lasso_cv_ACC <- cv.glmnet(x, y)
 # plot(field4_lasso_cv_ACC)
+
+# compare different alpha values
+# compare different alpha values
+field4_lasso_cv_ACC1 <- cv.glmnet(x, y, alpha=1)
+field4_lasso_cv_ACC.95 <- cv.glmnet(x, y, alpha=0.95)
+field4_lasso_cv_ACC.5 <- cv.glmnet(x, y, alpha=0.5)
+field4_lasso_cv_ACC0 <- cv.glmnet(x, y, alpha=0)
+plot(field4_lasso_cv_ACC1)
+plot(field4_lasso_cv_ACC.95)
+plot(field4_lasso_cv_ACC.5)
+plot(field4_lasso_cv_ACC0)
+plot(log(field4_lasso_cv_ACC1$lambda),field4_lasso_cv_ACC1$cvm,pch=19,
+     col="red",xlab="log(Lambda)",ylab=field4_lasso_cv_ACC1$name, 
+     xlim = c(-6,6), ylim = c(2.1,3.4))
+points(log(field4_lasso_cv_ACC.95$lambda),field4_lasso_cv_ACC.95$cvm,pch=19,col="green")
+points(log(field4_lasso_cv_ACC.5$lambda),field4_lasso_cv_ACC.5$cvm,pch=19,col="grey")
+points(log(field4_lasso_cv_ACC0$lambda),field4_lasso_cv_ACC0$cvm,pch=19,col="blue")
+legend("topleft",legend=c("alpha= 1","alpha= .95","alpha= .5","alpha 0"),pch=19,col=c("red","green","grey","blue"))
 
 # use no specific lambda
 field4_lasso_ACC_pred_test <- predict(field4_lasso_ACC, new = test_x)
@@ -825,90 +986,20 @@ abline(lm(field4_lasso_ACC_pred_all_lambda ~ field4_train$LT50ACC))
 #lm(field4_lasso_ACC_pred_all_lambda ~ field4_train$LT50ACC)
 ```
 
-# compare different models
-```{r plot function for comparison}
-func_pred_plot <- function(x, y, main_text, limits = lim_values, labels){
-  plot(x, y, col = "white", main = main_text, 
-       xlim = limits, ylim = limits)
-  
-  text(x, y, labels)
-  text(-10, -6, paste("cor = ", round(cor(x, y), digits = 3)), col = "red")
-  abline(0, 1, col = "red")
-  
-  print(cor.test(x, y))
-}
-```
 
 
-## compare different models field 3
-```{r compare different models field 3}
-test_y <- field3_test$LT50ACC
-range(test_y)
-lim_values <- c(-12.6, -5.5)
+# Variable selection
 
-pdf("figures/field3_compare_model_validation.pdf", 8, 8)
-par(mfrow=c(2,2))
-func_pred_plot(x = test_y,
-               y = field3_lasso_ACC_pred_test_lambda,
-               main_text = "lasso model",
-               labels = field3_test$accession)
-
-func_pred_plot(x = test_y,
-               y = field3_predictionACC,
-               main_text = "regression model",
-               labels = field3_test$accession)
-
-func_pred_plot(x = test_y,
-               y = field3_predictionACC_factor,
-               main_text = "regression model (factor)",
-               labels = field3_test$accession)
-
-func_pred_plot(x = test_y,
-               y = field3_predictionACC_norm,
-               main_text = "regression model (norm BBCH)",
-               labels = field3_test$accession)
-dev.off()
-```
-
-## compare different models field 4
-```{r compare different models field 4}
-test_y <- field4_test$LT50ACC
-range(test_y)
-lim_values <- c(-11.6, -5.5)
-
-pdf("figures/field4_compare_model_validation.pdf", 8, 8)
-par(mfrow=c(2,2))
-func_pred_plot(x = test_y,
-               y = field4_lasso_ACC_pred_test_lambda,
-               main_text = "lasso model",
-               labels = field4_test$accession)
-
-func_pred_plot(x = test_y,
-               y = field4_predictionACC,
-               main_text = "regression model",
-               labels = field4_test$accession)
-
-func_pred_plot(x = test_y,
-               y = field4_predictionACC_factor,
-               main_text = "regression model (factor)",
-               labels = field4_test$accession)
-
-func_pred_plot(x = test_y,
-               y = field4_predictionACC_norm,
-               main_text = "regression model (norm BBCH)",
-               labels = field4_test$accession)
-dev.off()
-```
-
-
-# variable selection
-
-## forward selection
+## Forward selection
 ```{r forward selection}
 # Create initial NULL model
 field2_regressionACC_null <- lm(field2_train$LT50ACC ~ 1, data = field2_train)
 field3_regressionACC_null <- lm(field3_train$LT50ACC ~ 1, data = field3_train)
 field4_regressionACC_null <- lm(field4_train$LT50ACC ~ 1, data = field4_train)
+
+field2T_regressionACC_null <- lm(field2_trainT$LT50ACC ~ 1, data = field2_trainT)
+field3T_regressionACC_null <- lm(field3_trainT$LT50ACC ~ 1, data = field3_trainT)
+field4T_regressionACC_null <- lm(field4_trainT$LT50ACC ~ 1, data = field4_trainT)
 
 # Choose a model by AIC in a Stepwise Algorithm
 # Forward
@@ -970,7 +1061,7 @@ field3_regressionACC_factorAIC <- step(field3_regressionACC_null,
                                        scope = formula(field3_regressionACC_factor), 
                                        direction = "both")
 summary(field3_regressionACC_factorAIC)
-# factor(bbch), pro, suc
+# factor(bbch), pro, raf, glc
 
 field4_regressionACC_factorAIC <- step(field4_regressionACC_null, 
                                        scope = formula(field4_regressionACC_factor), 
@@ -997,6 +1088,46 @@ head(data.frame(accession = field4_test$accession,
                 predicted_full = predict(field4_regressionACC_factor, field4_test)))
 ```
 
+### transformed and scaled data: default direction (if missing): backward!!!
+```{r transformed and scaled data: selection in both directions}
+############  SELECTION in BOTH DIRECTIONS ###################
+# Both directions, starting from Null model (WITH FACTOR!)
+field2T_regressionACC_factorAIC <- step(field2T_regressionACC_null, 
+                                       scope = formula(field2T_regressionACC_factor), 
+                                       direction = "both")
+# raf, fum, mal
+
+field3T_regressionACC_factorAIC <- step(field3T_regressionACC_null, 
+                                       scope = formula(field3T_regressionACC_factor), 
+                                       direction = "both")
+summary(field3T_regressionACC_factorAIC)
+# factor(bbch), aa, suc
+
+field4T_regressionACC_factorAIC <- step(field4T_regressionACC_null, 
+                                       scope = formula(field4T_regressionACC_factor), 
+                                       direction = "both")
+summary(field4T_regressionACC_factorAIC)
+# factor(bbch), raf, suc
+
+
+# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
+sum(((predict(field4T_regressionACC_factorAIC, field4_testT)) - (field4_test$LT50ACC))^2) / sum((field4_test$LT50ACC)^2)
+# 0.0209
+sum(((predict(field4T_regressionACC_factorAIC, field4_testT)) - (field4_test$LT50ACC))^2)
+# 47.6
+
+# bind predicted and measured LT50ACC for accessions of test set
+head(data.frame(accession = field3_test$accession, 
+                measured = field3_test$LT50ACC,
+                predicted_reduced = predict(field3T_regressionACC_factorAIC, field3_testT),
+                predicted_full = predict(field3T_regressionACC_factor, field3_testT)))
+
+head(data.frame(accession = field4_test$accession, 
+                measured = field4_test$LT50ACC,
+                predicted_reduced = predict(field4T_regressionACC_factorAIC, field4_testT),
+                predicted_full = predict(field4T_regressionACC_factor, field4_testT)))
+```
+
 
 ### stepAIC default
 #### default direction (if missing): backward!!!
@@ -1004,11 +1135,19 @@ head(data.frame(accession = field4_test$accession,
 field4_stepAIC_ACC <- stepAIC(field4_regressionACC)
 field4_stepAIC_ACC$coefficients
 
+field2T_stepAIC_ACC_factor <- stepAIC(field2T_regressionACC_factor) # mal fum raf (AIC=72.58)
+field3T_stepAIC_ACC_factor <- stepAIC(field3T_regressionACC_factor) # fum pro glc raf (AIC=99.08)
+field4T_stepAIC_ACC_factor <- stepAIC(field4T_regressionACC_factor) # suc raf factor(bbch) (AIC=94.17)
+
 # predited values for accessions that are included in the null model (training data)
 # field4_stepAIC_ACC$fitted.values
 
 # predited values for accessions that are NOT included in the null model (test data)
 field4_prediction_stepAIC_ACC <- predict(field4_stepAIC_ACC, field4_test)
+
+field2T_prediction_stepAIC_ACC_factor <- predict(field2T_stepAIC_ACC_factor, field2_testT)
+field3T_prediction_stepAIC_ACC_factor <- predict(field3T_stepAIC_ACC_factor, field3_testT)
+field4T_prediction_stepAIC_ACC_factor <- predict(field4T_stepAIC_ACC_factor, field4_testT)
  
 head(data.frame(accession = field4_test$accession, 
                 measured = field4_test$LT50ACC, 
@@ -1016,10 +1155,12 @@ head(data.frame(accession = field4_test$accession,
                 predicted_full = predict(field4_regressionACC, field4_test)))
 
 # Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
-sum(((field4_prediction_stepAIC_ACC) - (field4_test$LT50ACC))^2)
-# 51.4
-sum(((field4_prediction_stepAIC_ACC) - (field4_test$LT50ACC))^2)/ sum((field4_test$LT50ACC)^2)
-# 0.0227
+sum(((field4_prediction_stepAIC_ACC) - (field4_test$LT50ACC))^2) # 51.4
+sum(((field4_prediction_stepAIC_ACC) - (field4_test$LT50ACC))^2)/ sum((field4_test$LT50ACC)^2) # 0.0227
+
+sum(((field4T_prediction_stepAIC_ACC_factor) - (field4_test$LT50ACC))^2) # 47.6
+sum(((field4T_prediction_stepAIC_ACC_factor) - (field4_test$LT50ACC))^2)/ sum((field4_test$LT50ACC)^2) # 0.0209
+sum(((predict(field4T_regressionACC_factor, field4_testT)) - (field4_test$LT50ACC))^2) # 54.1 (full model)
 ```
 
 
@@ -1044,6 +1185,17 @@ sum(((field4_prediction_stepAIC_ACC) - (field4_test$LT50ACC))^2)/ sum((field4_te
 step(field4_regressionACC, scope=formula(field4_regressionACC), direction="backward")
 # fuehrt zum gleichen Ergebnis wir stepAIC, da bei step auch der AIC-Wert minimiert wird (backward)
 
+step(field2T_regressionACC_factor, scope=formula(field2T_regressionACC_factor), direction="backward")
+# AIC=72.58, mal, raf, fum
+
+step(field3T_regressionACC_factor, scope=formula(field3T_regressionACC_factor), direction="backward")
+# AIC=99.08, glc, raf, fum, pro --> minimal AIC (but small difference)
+step(field3T_regressionACC_null, scope=formula(field3T_regressionACC_factor), direction="both")
+# AIC=99.49, suc, aa, factor(bbch)
+field3T_prediction_stepAIC_ACC_factor2 <- predict(field3T_regressionACC_factorAIC, field3_testT)
+
+step(field4T_regressionACC_factor, scope=formula(field4T_regressionACC_factor), direction="backward")
+# AIC=94.17, suc, raf, factor(bbch)
 ```
 
 
@@ -1163,6 +1315,392 @@ pairs(data.frame(field2_error_cv, field3_error_cv, field4_error_cv))
 pairs(data.frame(log(field2_error_cv), log(field3_error_cv), log(field4_error_cv)))
 ```
 
+# compare different models
+```{r plot function for comparison}
+func_pred_plot <- function(x, y, main_text, limits = lim_values, labels){
+  plot(x, y, col = "white", main = main_text, 
+       xlim = limits, ylim = limits)
+  
+  text(x, y, labels)
+  text(-10, -6, paste("cor = ", round(cor(x, y), digits = 3)), col = "red")
+  abline(0, 1, col = "red")
+  
+  print(cor.test(x, y))
+}
+```
+
+## compare different models field 2
+```{r compare different models field 2}
+test_y <- field2_test$LT50ACC
+range(test_y)
+lim_values <- c(-11.5, -5.5)
+
+pdf("figures/field2_compare_model_validation.pdf", 8, 8)
+par(mfrow=c(2,2))
+
+func_pred_plot(x = test_y,
+               y = field2_lasso_ACC_pred_test_lambda,
+               main_text = "lasso model",
+               labels = field2_test$accession)
+
+func_pred_plot(x = test_y,
+               y = field2T_predictionACC_factor,
+               main_text = "full reg model with scaled data",
+               labels = field2_testT$accession)
+
+func_pred_plot(x = test_y,
+               y = field2T_prediction_stepAIC_ACC_factor,
+               main_text = "reduced reg model with scaled data",
+               labels = field2_testT$accession)
+
+func_pred_plot(x = test_y,
+               y = field2_predictionACC_factor,
+               main_text = "full reg model (factor)",
+               labels = field2_test$accession)
+dev.off()
+```
+
+
+## compare different models field 3
+```{r compare different models field 3}
+test_y <- field3_test$LT50ACC
+range(test_y)
+lim_values <- c(-11.5, -5.5)
+
+pdf("figures/field3_compare_model_validation.pdf", 8, 8)
+par(mfrow=c(2,2))
+
+func_pred_plot(x = test_y,
+               y = field3_lasso_ACC_pred_test_lambda,
+               main_text = "lasso model",
+               labels = field3_test$accession)
+
+# func_pred_plot(x = test_y,
+#                y = field3_predictionACC,
+#                main_text = "regression model",
+#                labels = field3_test$accession)
+
+func_pred_plot(x = test_y,
+               y = field3T_predictionACC_factor,
+               main_text = "full reg model with scaled data",
+               labels = field3_testT$accession)
+
+func_pred_plot(x = test_y,
+               # y = field3T_prediction_stepAIC_ACC_factor,
+               y = field3T_prediction_stepAIC_ACC_factor2,
+               main_text = "reduced reg model with scaled data",
+               labels = field3_testT$accession)
+
+func_pred_plot(x = test_y,
+               y = field3_predictionACC_factor,
+               main_text = "full reg model (factor)",
+               labels = field3_test$accession)
+
+# func_pred_plot(x = test_y,
+#                y = field3_predictionACC_norm,
+#                main_text = "regression model (norm BBCH)",
+#                labels = field3_test$accession)
+dev.off()
+```
+
+## compare different models field 4
+```{r compare different models field 4}
+test_y <- field4_test$LT50ACC
+range(test_y)
+lim_values <- c(-11.5, -5.5)
+
+pdf("figures/field4_compare_model_validation.pdf", 8, 8)
+par(mfrow=c(2,2))
+func_pred_plot(x = test_y,
+               y = field4_lasso_ACC_pred_test_lambda,
+               main_text = "lasso model",
+               labels = field4_test$accession)
+
+# func_pred_plot(x = test_y,
+#                y = field4_predictionACC,
+#                main_text = "regression model",
+#                labels = field4_test$accession)
+
+func_pred_plot(x = test_y,
+               y = field4T_predictionACC_factor,
+               main_text = "full reg model with scaled data",
+               labels = field4_testT$accession)
+
+func_pred_plot(x = test_y,
+               y = field4T_prediction_stepAIC_ACC_factor,
+               main_text = "reduced reg model with scaled data",
+               labels = field4_testT$accession)
+
+
+func_pred_plot(x = test_y,
+               y = field4_predictionACC_factor,
+               main_text = "full reg model (factor)",
+               labels = field4_test$accession)
+
+# func_pred_plot(x = test_y,
+#                y = field4_predictionACC_norm,
+#                main_text = "regression model (norm BBCH)",
+#                labels = field4_test$accession)
+dev.off()
+```
+
+
+# Caret
+## Tuning parameters
+```{r caret tuning parameters}
+grid <- 10^ seq (10,-2, length = 100) # for lambda
+
+# for glmnet (elastic net)
+eGrid <- expand.grid(.alpha = c(0, .05, .1, .3, .5, .7, .9, .95, .99, 1), 
+                     .lambda = 10^seq(from = -6,to = 0, length = 50)) # or grid
+                     #.lambda = seq(1e-6, 1, length = 50)) # or grid
+
+# for lasso
+eGrid_lasso <- expand.grid(.fraction = 10^seq(from = -6,to = 0, length = 50)) # or grid
+
+
+Control <- trainControl(#method = "LOOCV",
+                        method = "repeatedcv", 
+                        repeats = 5, number = 10,
+                        verboseIter = TRUE)
+```
+
+### plot
+```{r plot}
+field4_pred_loocv <- func_calc_loocv_caret(field4, method_val = "lasso", eGrid_val = eGrid_lasso)
+field4_known_LT50 <- field4$LT50ACC[which(field4$accession %in% accessions_known)]
+plot(field4_known_LT50, field4_pred_loocv)
+
+par(mfrow=c(1,1))
+func_pred_plot(x = field4_known_LT50,
+               y = field4_pred_loocv,
+               main_text = "lasso model",
+               labels = names(field4_pred_loocv))
+
+
+```
+
+
+## try out training with first fold of training data: field 3
+```{r try out training with first fold of training data field 3}
+method_val <- "glmnet"
+# method_val <- "lasso"
+
+# x_f3_train_caret <- field3_train[,c(6:15)]
+# y_f3_train_caret <- field3_train$LT50ACC
+# x_f3_test <- field3_test[,c(6:15)]
+# y_f3_test <- field3_test$LT50ACC
+
+x_f3_train_caret <- field3_trainT[,c(6:15)]
+y_f3_train_caret <- field3_trainT$LT50ACC
+x_f3_test <- field3_testT[,c(6:15)]
+y_f3_test <- field3_testT$LT50ACC
+
+set.seed(1234)
+lassoFit_f3T <- train(x = x_f3_train_caret, 
+                   y = y_f3_train_caret,
+                   method = "lasso",
+                   metric = "RMSE",
+                   tuneGrid = eGrid_lasso,
+                   trControl = Control)
+
+set.seed(1234)
+glmnetFit_f3T <- train(x = x_f3_train_caret, 
+                   y = y_f3_train_caret,
+                   method = "glmnet",
+                   metric = "RMSE",
+                   tuneGrid = eGrid,
+                   trControl = Control)
+
+lassoFit_f3$bestTune # alpha: 1
+# 0.754
+# R2: 0.2149733
+
+glmnetFit_f3$bestTune
+# original training data
+# alpha: 0, lambda: 0.3237 --> ridge regression
+# R2: 0.1481273, R: 0.385, RMSE: 1.61
+
+# glmnet
+table(coef(netFit_f3$finalModel, s = netFit_f3$bestTune$lambda)[,1] != 0)
+# 4874 predictors (+ intercept) have coefficients that are not zero, the rest was removed
+
+# table(coef(netFit_f3$finalModel, s = netFit_f3$bestTune$fraction)[,1] != 0)
+
+plot(lassoFit_f3, metric = "Rsquared")
+plot(lassoFit_f3T, metric = "Rsquared")
+plot(lassoFit_f3, metric = "RMSE")
+plot(glmnetFit_f3, metric = "Rsquared")
+plot(glmnetFit_f3T, metric = "Rsquared")
+
+plot(y_f3_test, predict(netFit_f3, newdata = x_f3_test))
+cor.test(y_f3_test, predict(lassoFit_f3, newdata = x_f3_test)) #  0.558
+cor.test(y_f3_test, predict(glmnetFit_f3, newdata = x_f3_test)) # 0.569
+cor.test(y_f3_train_caret, predict(lassoFit_f3, newdata = x_f3_train_caret))  # 0.53
+cor.test(y_f3_train_caret, predict(glmnetFit_f3, newdata = x_f3_train_caret)) # 0.521
+
+plot(field3_train$LT50ACC, predict(netFit_f3, newdata = x_f3_train_caret), 
+     ylim=range(field3_train$LT50ACC), col="white")
+text(field3_train$LT50ACC, predict(netFit_f3, newdata = x_f3_train_caret),
+     labels = as.character(field3_train$accession), cex = 0.8)
+abline(0, 1, col = "grey")
+abline(lm(predict(netFit_f3, newdata = x_f3_train_caret) ~ field3_train$LT50ACC), col = "red")
+```
+
+## try out training with first fold of training data: field 4
+```{r try out training with first fold of training data field 4}
+# x_f4_train_caret <- field4_train[,c(6:15)]
+# y_f4_train_caret <- field4_train$LT50ACC
+# x_f4_test <- field4_test[,c(6:15)]
+# y_f4_test <- field4_test$LT50ACC
+
+x_f4_train_caret <- field4_trainT[,c(6:15)]
+y_f4_train_caret <- field4_trainT$LT50ACC
+x_f4_test <- field4_testT[,c(6:15)]
+y_f4_test <- field4_testT$LT50ACC
+
+set.seed(1234)
+lassoFit_f4T <- train(x = x_f4_train_caret, 
+                     y = y_f4_train_caret,
+                     method = "lasso",
+                     metric = "RMSE",
+                     tuneGrid = eGrid_lasso,
+                     trControl = Control)
+
+set.seed(1234)
+glmnetFit_f4T <- train(x = x_f4_train_caret, 
+                      y = y_f4_train_caret,
+                      method = "glmnet",
+                      metric = "RMSE",
+                      tuneGrid = eGrid,
+                      trControl = Control)
+
+lassoFit_f4$bestTune
+# 0.569
+# R2: 0.3687, R: 0.606
+
+glmnetFit_f4$bestTune
+# alpha: 0.95, lambda: 0.07906043 --> nearly ridge regression
+# R2: 0.3678, R: 0.606, RMSE: 1.493873
+
+# glmnet
+table(coef(netFit_f4$finalModel, s = netFit_f4$bestTune$lambda)[,1] != 0)
+# 4874 predictors (+ intercept) have coefficients that are not zero, the rest was removed
+
+# table(coef(netFit_f4$finalModel, s = netFit_f4$bestTune$fraction)[,1] != 0)
+
+plot(lassoFit_f4, metric = "Rsquared")
+plot(lassoFit_f4T, metric = "Rsquared")
+plot(glmnetFit_f4, metric = "Rsquared")
+plot(glmnetFit_f4T, metric = "Rsquared")
+
+# plot(y_f4_test, predict(glmnetFit_f4, newdata = x_f4_test))
+cor(y_f4_test, predict(lassoFit_f4T, newdata = x_f4_test)) #  0.537
+cor(y_f4_test, predict(glmnetFit_f4T, newdata = x_f4_test)) # 0.536
+cor(y_f4_train_caret, predict(lassoFit_f4T, newdata = x_f4_train_caret))  # 0.623
+cor(y_f4_train_caret, predict(glmnetFit_f4T, newdata = x_f4_train_caret)) # 0.623
+
+plot(field4_train$LT50ACC, predict(netFit_f4, newdata = x_f4_train_caret), 
+     ylim=range(field4_train$LT50ACC), col="white")
+text(field4_train$LT50ACC, predict(netFit_f4, newdata = x_f4_train_caret),
+     labels = as.character(field4_train$accession), cex = 0.8)
+abline(0, 1, col = "grey")
+abline(lm(predict(netFit_f4, newdata = x_f4_train_caret) ~ field4_train$LT50ACC), col = "red")
+```
+
+```{r}
+par(mfrow=c(2,2))
+func_pred_plot(x = test_y,
+               y = field3_lasso_ACC_pred_test_lambda,
+               main_text = "lasso model field 3",
+               labels = field3_test$accession)
+
+func_pred_plot(x = test_y,
+               y = predict(netFit_f3, newdata = x_f3_test),
+               main_text = "caret model field 3",
+               labels = field3_test$accession)
+
+func_pred_plot(x = test_y,
+               y = field4_lasso_ACC_pred_test_lambda,
+               main_text = "lasso model field 4",
+               labels = field4_test$accession)
+
+func_pred_plot(x = test_y,
+               y = predict(netFit_f4, newdata = x_f4_test),
+               main_text = "caret model field 4",
+               labels = field4_test$accession)
+```
+
+
+
+## caret with nested CV
+```{r caret with nested CV}
+method_val <- "glmnet"
+# method_val <- "lasso"
+
+# predicted and corresponding true values
+dim(folds)
+# yhats_caret = matrix(nrow = nrow(folds), ncol = ncol(folds)) # fold in column
+yhats_caret <- list()
+rsquared_caret <- c()
+
+fit_caret <- list()
+fitcv_caret <- list()
+
+# iterate over the outer folds 
+for(i in 1:ncol(folds)){
+  
+  x_f4_train_caret <- x_f4_train[[i]]
+  x_f4_test_caret <- x_f4_test[[i]]
+  y_f4_train_caret <- y_f4_train[[i]]
+  y_f4_test_caret <- y_f4_test[[i]]
+  # colnames(x_train_caret) <- seq(1:ncol(x_train_caret))
+  # colnames(x_test_caret) <- seq(1:ncol(x_test_caret))
+  
+  fit_caret[[i]] <- train(x = x_f4_train_caret, 
+                          y = y_f4_train_caret,
+                          method = method_val,
+                          tuneGrid = eGrid,
+                          # tuneGrid = eGrid_lasso,
+                          trControl = Control)
+
+  # predict the test set observations and calculate prediction score
+  # yhats_caret[,i] <- predict(fit_caret[[i]], 
+  #                    newdata = x_f4_test_caret)
+  
+  yhats_caret[[i]] <- predict(fit_caret[[i]], 
+                              newdata = x_f4_test_caret)
+  
+  lm_fit <- lm(yhats_caret[[i]] ~ y_f4_test[[i]])
+  rsquared_caret[i] <- summary(lm_fit)$r.squared
+}
+
+plot(unlist(yhats_caret) ~ unlist(y_f4_test),
+     ylab = "predicted", xlab = "observed")
+
+lm_fit_caret <- lm(unlist(yhats_caret) ~ unlist(y_f4_test))
+summary(lm_fit_caret)$r.squared
+
+
+varImp(fit_caret[[1]])
+
+# get coefficients of variables for best model (1st fold of training data)
+coef(fit_caret[[1]]$finalModel, s = fit_caret[[1]]$bestTune$lambda) # is nearly equivalent to glmnet model result
+
+table(coef(fit_caret[[1]]$finalModel, s = fit_caret[[1]]$bestTune$lambda)[,1] != 0)
+table(coef(fit_caret[[2]]$finalModel, s = fit_caret[[2]]$bestTune$lambda)[,1] != 0)
+
+sel_var <- as.integer(names(which(coef(fit_caret[[1]]$finalModel, s = fit_caret[[1]]$bestTune$lambda)[,1] != 0)))
+sel_var_names <- names_keep_int_c[sel_var[-1]]
+View(cor_int_all_r[sel_var_names,])
+View(cor_int_all_p[sel_var_names,])
+
+hist(log10(cor_int_c$pval_adj[sel_var_names,]))
+hist(log10(cor_int_c$pval_adj))
+
+hist(cor_int_c$coeff[sel_var_names,])
+hist(cor_int_c$coeff)
+```
 
 
 # Save workspace
