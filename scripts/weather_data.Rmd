@@ -25,6 +25,7 @@ setwd("X:/mpimp/repos/ara_field_trials/")
 library(knitr)
 library(pander)
 library(ggplot2)
+library(ggpubr)
 
 # set options for knitr
 opts_chunk$set(fig.width=10, fig.height=5)
@@ -137,6 +138,7 @@ temp_plot <- ggplot(wetter, aes(x = Date2, y = Temp, group = Feld)) +
   geom_line() +
   facet_wrap(~ Feld_Name, scales="free_x") + 
   scale_x_date(date_breaks = "1 month", date_labels = "%Y-%b") +
+  theme_pubr() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   geom_hline(aes(yintercept=0), colour="#BB0000") + 
   ylab("Temperature (°C)") + xlab("Date")
@@ -220,6 +222,7 @@ snow_depth_plot <- ggplot(wetter, aes(x = Date2, y = Schnee, group = Feld)) +
   geom_bar(stat = "identity", fill = "black") +
   facet_wrap(~ Feld_Name, scales="free_x") + 
   scale_x_date(date_breaks = "1 month", date_labels = "%Y-%b") +
+  theme_pubr() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   ylab("Snow depth (cm)") + xlab("Date")
 
@@ -290,6 +293,7 @@ abline(v=as.numeric(Date_feld4[212]), lty=2, col='grey')
 sunshine_plot <- ggplot(wetter, aes(x = Date2, y = Sonne, group = Feld)) + 
   geom_bar(stat = "identity",  fill = "black") +
   facet_wrap(~ Feld_Name, scales="free_x") + 
+  theme_pubr() +
   scale_x_date(date_breaks = "1 month", date_labels = "%Y-%b") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   ylab("Sunshine duration (min)") + xlab("Date")

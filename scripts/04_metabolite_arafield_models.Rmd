@@ -31,6 +31,8 @@ library(faraway)
 library(MASS)
 library(glmnet)
 library(caret)
+library(tidyverse)
+library(ggpubr)
 
 # set options for knitr
 opts_chunk$set(fig.width=6, fig.height=5, tidy=TRUE, tidy.opts=list(width.cutoff=70))
@@ -145,17 +147,17 @@ hist(field4$prolineT)
 hist(scale(field4$prolineT))
 
 field2_scaled <- data.frame(field2[,c("accession", "plant_name", "LT50ACC", "LT50NAC", 
-                                      "capacity", "bbch_id", "anthoscore")],
+                                      "capacity", "bbch_id", "anthoscore", "bbch_factor", "antho_value_en")],
                             scale(field2[,c("glucoseT","fructoseT","sucroseT","raffinoseT",
                                             "amino_acidsT","malateT","fumarateT","prolineT")]))
 
 field3_scaled <- data.frame(field3[,c("accession", "plant_name", "LT50ACC", "LT50NAC", 
-                                      "capacity", "bbch_id", "anthoscore")],
+                                      "capacity", "bbch_id", "anthoscore", "bbch_factor", "antho_value_en")],
                             scale(field3[,c("glucoseT","fructoseT","sucroseT","raffinoseT",
                                             "amino_acidsT","malateT","fumarateT","prolineT")]))
 
 field4_scaled <- data.frame(field4[,c("accession", "plant_name", "LT50ACC", "LT50NAC", 
-                                      "capacity", "bbch_id", "anthoscore")],
+                                      "capacity", "bbch_id", "anthoscore", "bbch_factor", "antho_value_en")],
                             scale(field4[,c("glucoseT","fructoseT","sucroseT","raffinoseT",
                                             "amino_acidsT","malateT","fumarateT","prolineT")]))
 ```
@@ -215,6 +217,9 @@ model_colnames_short <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "cap"
 model_colnamesT <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "capacity",
                     "glucoseT", "fructoseT", "sucroseT","raffinoseT", "amino_acidsT", 
                     "malateT", "fumarateT", "prolineT", "bbch_id", "anthoscore")
+
+model_colnamesT_factor <- model_colnamesT
+model_colnamesT_factor[14:15] <- c("bbch_factor", "antho_value_en")
 ```
 
 
@@ -227,6 +232,9 @@ field4_train <- field4[idx_train4, model_colnames]
 field2_trainT <- field2_scaled[idx_train2, model_colnamesT]
 field3_trainT <- field3_scaled[idx_train3, model_colnamesT]
 field4_trainT <- field4_scaled[idx_train4, model_colnamesT]
+field2_trainT_fac <- field2_scaled[idx_train2, model_colnamesT_factor]
+field3_trainT_fac <- field3_scaled[idx_train3, model_colnamesT_factor]
+field4_trainT_fac <- field4_scaled[idx_train4, model_colnamesT_factor]
 field2_train_norm <- field2[idx_train2, model_colnames_norm]
 field3_train_norm <- field3[idx_train3, model_colnames_norm]
 field4_train_norm <- field4[idx_train4, model_colnames_norm]
@@ -238,6 +246,9 @@ field4_test <- field4[idx_test4, model_colnames]
 field2_testT <- field2_scaled[idx_test2, model_colnamesT]
 field3_testT <- field3_scaled[idx_test3, model_colnamesT]
 field4_testT <- field4_scaled[idx_test4, model_colnamesT]
+field2_testT_fac <- field2_scaled[idx_test2, model_colnamesT_factor]
+field3_testT_fac <- field3_scaled[idx_test3, model_colnamesT_factor]
+field4_testT_fac <- field4_scaled[idx_test4, model_colnamesT_factor]
 field2_test_norm <- field2[idx_test2, model_colnames_norm]
 field3_test_norm <- field3[idx_test3, model_colnames_norm]
 field4_test_norm <- field4[idx_test4, model_colnames_norm]
@@ -249,6 +260,10 @@ field4_all <- field4[idx_all4, model_colnames]
 field2_all_fac <- field2[idx_all2, model_colnames_factor]
 field3_all_fac <- field3[idx_all3, model_colnames_factor]
 field4_all_fac <- field4[idx_all4, model_colnames_factor]
+field2_allT_fac <- field2_scaled[idx_all2, model_colnamesT_factor]
+field3_allT_fac <- field3_scaled[idx_all3, model_colnamesT_factor]
+field4_allT_fac <- field4_scaled[idx_all4, model_colnamesT_factor]
+
 
 # only accessions with unknown LT50
 field2_unknown <- field2[idx_unknown2, model_colnames]
@@ -337,6 +352,7 @@ colnames(field2_train) <- colnames(field3_train) <- colnames(field4_train) <- mo
 colnames(field2_train_norm) <- colnames(field3_train_norm) <- colnames(field4_train_norm) <- model_colnames_short
 # transformed and scaled data
 colnames(field2_trainT) <- colnames(field3_trainT) <- colnames(field4_trainT) <- model_colnames_short
+colnames(field2_trainT_fac) <- colnames(field3_trainT_fac) <- colnames(field4_trainT_fac) <- model_colnames_short
 
 # test data
 colnames(field2_test) <- colnames(field3_test) <- colnames(field4_test) <- model_colnames_short
@@ -344,10 +360,12 @@ colnames(field2_test) <- colnames(field3_test) <- colnames(field4_test) <- model
 colnames(field2_test_norm) <- colnames(field3_test_norm) <- colnames(field4_test_norm) <- model_colnames_short
 # transformed and scaled data
 colnames(field2_testT) <- colnames(field3_testT) <- colnames(field4_testT) <- model_colnames_short
+colnames(field2_testT_fac) <- colnames(field3_testT_fac) <- colnames(field4_testT_fac) <- model_colnames_short
 
 # all accessions
 colnames(field2_all) <- colnames(field3_all) <- colnames(field4_all) <- model_colnames_short
 colnames(field2_all_fac) <- colnames(field3_all_fac) <- colnames(field4_all_fac) <- model_colnames_short
+colnames(field2_allT_fac) <- colnames(field3_allT_fac) <- colnames(field4_allT_fac) <- model_colnames_short
 
 # data for accessions of unknown LT50
 colnames(field2_unknown) <- colnames(field3_unknown) <- colnames(field4_unknown) <- model_colnames_short
@@ -448,15 +466,57 @@ summary(field4T_regressionACC)$r.squared # 0.399
 ## Use transformed and scaled data (with factor)
 ```{r regACC transformed and scaled data - with factor}
 field2T_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                     factor(bbch) + factor(anthoscore), data = field2_trainT)
+                                     bbch + anthoscore, data = field2_trainT_fac)
 field3T_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                     factor(bbch) + factor(anthoscore), data = field3_trainT)
+                                     bbch + anthoscore, data = field3_trainT_fac)
 field4T_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                     factor(bbch) + factor(anthoscore), data = field4_trainT)
+                                     bbch + anthoscore, data = field4_trainT_fac)
 
 summary(field2T_regressionACC_factor)$r.squared # 0.481
 summary(field3T_regressionACC_factor)$r.squared # 0.350
 summary(field4T_regressionACC_factor)$r.squared # 0.428
+
+cor(field4T_regressionACC_factor$fitted.values, field4_trainT$LT50ACC) # R = 0.654
+#predict(field4T_regressionACC_factor, field4_trainT[,6:15]) # equivalent to fitted.values
+```
+
+## Combine predictions across trials
+```{r combine training predictions across trials}
+pred_df2_train <- data.frame(data = "trial2",
+                       accession = field2_trainT_fac$accession,
+                       measured = field2_trainT_fac$LT50ACC,
+                       predicted = field2T_regressionACC_factor$fitted.values)
+
+pred_df3_train <- data.frame(data = "trial3",
+                       accession = field3_trainT_fac$accession,
+                       measured = field3_trainT_fac$LT50ACC,
+                       predicted = field3T_regressionACC_factor$fitted.values)
+
+pred_df4_train <- data.frame(data = "trial4",
+                       accession = field4_trainT_fac$accession,
+                       measured = field4_trainT_fac$LT50ACC,
+                       predicted = field4T_regressionACC_factor$fitted.values)
+
+pred_df_train <- rbind(pred_df2_train, pred_df3_train, pred_df4_train)
+```
+
+## Correlation scatter plot
+```{r correlation training scatter plot}
+range(pred_df_train$predicted)
+range(pred_df_train$measured)
+lim_values <- c(-12.5, -5)
+
+sp_train <- ggscatter(pred_df_train, x = "measured", y = "predicted",
+                add = "reg.line", 
+                add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+                conf.int = TRUE)
+
+sp_train_lim <- ggpar(sp_train, ylim = lim_values, xlim = lim_values)
+sp_train_facet <- facet(sp_train_lim + theme_bw(), facet.by = "data")
+sp_train_final <- sp_train_facet + stat_cor(method = "pearson", label.x.npc = 'center', label.y.npc = 'top')
+
+ggsave(filename = "figures/predictions_train_corr_plot.png", 
+       plot = sp_train_final, width = 10, height = 4, dpi = 600)
 ```
 
 
@@ -489,6 +549,137 @@ summary(field2_regressionACC_all_factor)$r.squared # 0.479
 summary(field3_regressionACC_all_factor)$r.squared # 0.394
 summary(field4_regressionACC_all_factor)$r.squared # 0.412
 summary(field4_regressionACC_all_factor)$adj.r.squared # Adjusted R-squared: 0.309
+```
+
+## Use transformed and scaled data (with factor)
+```{r regACC transformed and scaled data - with factor}
+field2T_regressionACC_all_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                     bbch + anthoscore, data = field2_allT_fac)
+field3T_regressionACC_all_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                     bbch + anthoscore, data = field3_allT_fac)
+field4T_regressionACC_all_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
+                                     bbch + anthoscore, data = field4_allT_fac)
+
+summary(field2T_regressionACC_all_factor)$r.squared # 0.500
+summary(field3T_regressionACC_all_factor)$r.squared # 0.394
+summary(field4T_regressionACC_all_factor)$r.squared # 0.410
+
+cor(field4T_regressionACC_all_factor$fitted.values, field4_allT_fac$LT50ACC) # R = 0.640
+#predict(field4T_regressionACC_all_factor, field4_allt_fac[,6:15]) # equivalent to fitted.values
+```
+
+# Apply models to different datasets (other trials)
+```{r apply models to different datasets ALL}
+field2T_regressionACC_all_factor$xlevels$bbch <- union(field2T_regressionACC_all_factor$xlevels$bbch,
+                                                   union(levels(field3_allT_fac$bbch),
+                                                         levels(field4_allT_fac$bbch)))
+field3T_regressionACC_all_factor$xlevels$bbch <- union(field3T_regressionACC_all_factor$xlevels$bbch,
+                                                   levels(field4_allT_fac$bbch))
+field4T_regressionACC_all_factor$xlevels$bbch <- union(field4T_regressionACC_all_factor$xlevels$bbch,
+                                                   levels(field3_allT_fac$bbch))
+
+
+field3T_regressionACC_all_factor$xlevels$anthoscore <- union(field3T_regressionACC_all_factor$xlevels$anthoscore,
+                                                             levels(field4_allT_fac$anthoscore))
+
+field3T_regressionACC_all_factor_pred2 <- predict(field3T_regressionACC_all_factor, field2_allT_fac[,6:15]) # 3>2
+field3T_regressionACC_all_factor_pred4 <- predict(field3T_regressionACC_all_factor, field4_allT_fac[,6:15]) # 3>4
+field4T_regressionACC_all_factor_pred2 <- predict(field4T_regressionACC_all_factor, field2_allT_fac[,6:15]) # 4>2
+field4T_regressionACC_all_factor_pred3 <- predict(field4T_regressionACC_all_factor, field3_allT_fac[,6:15]) # 4>3
+field2T_regressionACC_all_factor_pred3 <- predict(field2T_regressionACC_all_factor, field3_allT_fac[,6:15]) # 2>3
+field2T_regressionACC_all_factor_pred4 <- predict(field2T_regressionACC_all_factor, field4_allT_fac[,6:15]) # 2>4
+```
+
+```{r apply models to different datasets}
+field2T_regressionACC_factor$xlevels$bbch <- union(field2T_regressionACC_factor$xlevels$bbch,
+                                                   union(levels(field3_trainT_fac$bbch),
+                                                         levels(field4_trainT_fac$bbch)))
+field4T_regressionACC_factor$xlevels$bbch <- union(field4T_regressionACC_factor$xlevels$bbch,
+                                                   levels(field3_trainT_fac$bbch))
+field3T_regressionACC_factor$xlevels$bbch <- union(field3T_regressionACC_factor$xlevels$bbch,
+                                                   levels(field4_trainT_fac$bbch))
+field3T_regressionACC_factor$xlevels$anthoscore <- union(field3T_regressionACC_factor$xlevels$anthoscore,
+                                                         levels(field4_trainT_fac$anthoscore))
+
+field3T_regressionACC_factor_pred2 <- predict(field3T_regressionACC_factor, field2_trainT_fac[,6:15]) # 3>2
+field3T_regressionACC_factor_pred4 <- predict(field3T_regressionACC_factor, field4_trainT_fac[,6:15]) # 3>4
+field4T_regressionACC_factor_pred2 <- predict(field4T_regressionACC_factor, field2_trainT_fac[,6:15]) # 4>2
+field4T_regressionACC_factor_pred3 <- predict(field4T_regressionACC_factor, field3_trainT_fac[,6:15]) # 4>3
+field2T_regressionACC_factor_pred3 <- predict(field2T_regressionACC_factor, field3_trainT_fac[,6:15]) # 2>3
+field2T_regressionACC_factor_pred4 <- predict(field2T_regressionACC_factor, field4_trainT_fac[,6:15]) # 2>4
+```
+
+## Plot predicted vs. measured LT50ACC (across trials)
+```{r plot predicted vs. measured LT50ACC (across trials)}
+plot(field2_trainT$LT50ACC, field3T_regressionACC_factor_pred2)
+cor(field2_trainT$LT50ACC, field3T_regressionACC_factor_pred2) # 0.45
+cor(field2_allT_fac$LT50ACC, field3T_regressionACC_all_factor_pred2) # 0.48
+
+plot(field4_trainT$LT50ACC, field3T_regressionACC_factor_pred4)
+cor(field4_trainT$LT50ACC, field3T_regressionACC_factor_pred4) # 0.485
+cor(field4_allT_fac$LT50ACC, field3T_regressionACC_all_factor_pred4) # 0.48
+
+plot(field3_trainT$LT50ACC, field4T_regressionACC_factor_pred3)
+cor(field3_trainT$LT50ACC, field4T_regressionACC_factor_pred3) # 0.413
+cor(field3_allT_fac$LT50ACC, field4T_regressionACC_all_factor_pred3) # 0.46
+
+plot(field2_trainT$LT50ACC, field4T_regressionACC_factor_pred2)
+cor(field2_trainT$LT50ACC, field4T_regressionACC_factor_pred2)
+
+plot(field3_trainT$LT50ACC, field2T_regressionACC_factor_pred3)
+cor(field3_trainT$LT50ACC, field2T_regressionACC_factor_pred3)
+
+plot(field4_trainT$LT50ACC, field2T_regressionACC_factor_pred4)
+cor(field4_trainT$LT50ACC, field2T_regressionACC_factor_pred4)
+```
+
+## Combine predictions across trials
+```{r combine predictions across trials}
+pred_df2 <- data.frame(data = "trial2",
+                       accession = field2_allT_fac$accession,
+                       measured = field2_allT_fac$LT50ACC,
+                       model2 = field2T_regressionACC_all_factor$fitted.values,
+                       model3 = field3T_regressionACC_all_factor_pred2,
+                       model4 = field4T_regressionACC_all_factor_pred2)
+
+pred_df3 <- data.frame(data = "trial3",
+                       accession = field3_allT_fac$accession,
+                       measured = field3_allT_fac$LT50ACC,
+                       model2 = field2T_regressionACC_all_factor_pred3,
+                       model3 = field3T_regressionACC_all_factor$fitted.values,
+                       model4 = field4T_regressionACC_all_factor_pred3)
+
+pred_df4 <- data.frame(data = "trial4",
+                       accession = field4_allT_fac$accession,
+                       measured = field4_allT_fac$LT50ACC,
+                       model2 = field2T_regressionACC_all_factor_pred4,
+                       model3 = field3T_regressionACC_all_factor_pred4,
+                       model4 = field4T_regressionACC_all_factor$fitted.values)
+
+pred_df_all <- rbind(pred_df2, pred_df3, pred_df4)
+
+pred_df_all_ <- 
+  pred_df_all %>%
+  gather(key = "model", value = "predicted", 4:6)
+```
+
+## Correlation scatter plot
+```{r correlation scatter plot}
+range(pred_df_all_$predicted)
+lim_values <- c(-12.5, -4)
+
+sp <- ggscatter(pred_df_all_, x = "measured", y = "predicted",
+                add = "reg.line", 
+                add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+                conf.int = TRUE)
+
+sp_lim <- ggpar(sp, ylim = lim_values, xlim = lim_values)
+
+sp_facet <- facet(sp_lim + theme_bw(), facet.by = c("model","data"))
+
+sp_final <- sp_facet + stat_cor(method = "pearson", label.x.npc = 'center', label.y.npc = 'top')
+
+ggsave(filename = "figures/predictions_all_corr_plot.png", plot = sp_final, width = 7, height = 7)
 ```
 
 
@@ -1182,20 +1373,70 @@ sum(((predict(field4T_regressionACC_factor, field4_testT)) - (field4_test$LT50AC
 
 ### backward selection
 ```{r backward selection}
-step(field4_regressionACC, scope=formula(field4_regressionACC), direction="backward")
-# fuehrt zum gleichen Ergebnis wir stepAIC, da bei step auch der AIC-Wert minimiert wird (backward)
-
-step(field2T_regressionACC_factor, scope=formula(field2T_regressionACC_factor), direction="backward")
+step(object = field2T_regressionACC_factor, scope=formula(field2T_regressionACC_factor), direction="backward")
+field2T_regressionACC_factor_red <- step(object = field2T_regressionACC_factor, 
+                                         scope = formula(field2T_regressionACC_factor), 
+                                         direction = "both")
 # AIC=72.58, mal, raf, fum
 
-step(field3T_regressionACC_factor, scope=formula(field3T_regressionACC_factor), direction="backward")
+
+step(object = field3T_regressionACC_factor, scope=formula(field3T_regressionACC_factor), direction="backward")
 # AIC=99.08, glc, raf, fum, pro --> minimal AIC (but small difference)
-step(field3T_regressionACC_null, scope=formula(field3T_regressionACC_factor), direction="both")
+field3T_regressionACC_factor_red <- step(object = field3T_regressionACC_null, 
+                                         scope = formula(field3T_regressionACC_factor), 
+                                         direction = "both")
 # AIC=99.49, suc, aa, factor(bbch)
 field3T_prediction_stepAIC_ACC_factor2 <- predict(field3T_regressionACC_factorAIC, field3_testT)
 
-step(field4T_regressionACC_factor, scope=formula(field4T_regressionACC_factor), direction="backward")
+
+step(object = field4T_regressionACC_factor, scope=formula(field4T_regressionACC_factor), direction="backward")
+field4T_regressionACC_factor_red <- step(object = field4T_regressionACC_factor, 
+                                         scope = formula(field4T_regressionACC_factor), 
+                                         direction = "both")
 # AIC=94.17, suc, raf, factor(bbch)
+```
+
+
+## Combine predictions across trials REDUCED
+```{r combine training predictions across trials REDUCED}
+pred_df2_train_red <- data.frame(data = "trial2",
+                                 accession = field2_trainT_fac$accession,
+                                 measured = field2_trainT_fac$LT50ACC,
+                                 predicted = field2T_regressionACC_factor_red$fitted.values)
+
+pred_df3_train_red <- data.frame(data = "trial3",
+                                 accession = field3_trainT_fac$accession,
+                                 measured = field3_trainT_fac$LT50ACC,
+                                 predicted = field3T_regressionACC_factor_red$fitted.values)
+
+pred_df4_train_red <- data.frame(data = "trial4",
+                                 accession = field4_trainT_fac$accession,
+                                 measured = field4_trainT_fac$LT50ACC,
+                                 predicted = field4T_regressionACC_factor_red$fitted.values)
+
+pred_df_train_red <- rbind(pred_df2_train_red, 
+                           pred_df3_train_red, 
+                           pred_df4_train_red)
+```
+
+
+## Correlation scatter plot
+```{r correlation training scatter plot REDUCED}
+range(pred_df_train_red$predicted)
+range(pred_df_train_red$measured)
+lim_values <- c(-12.5, -5)
+
+sp_red <- ggscatter(pred_df_train_red, x = "measured", y = "predicted",
+                add = "reg.line", 
+                add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+                conf.int = TRUE)
+
+sp_red_lim <- ggpar(sp_red, ylim = lim_values, xlim = lim_values)
+sp_red_facet <- facet(sp_red_lim + theme_bw(), facet.by = "data")
+sp_red_final <- sp_red_facet + stat_cor(method = "pearson", label.x.npc = 'center', label.y.npc = 'top')
+
+ggsave(filename = "figures/predictions_train_reduced_corr_plot.png", 
+       plot = sp_red_final, width = 10, height = 4, dpi = 600)
 ```
 
 
@@ -1302,6 +1543,79 @@ field4_prediction_stepAIC_Cap <- predict(field4_stepAIC_Cap, field4_test_norm)
 head(data.frame(accession = field4_test$accession,
                 measured = field4_test$cap,
                 predicted = field4_prediction_stepAIC_Cap))
+```
+
+
+# Model comparison regarding test set
+```{r Model comparison regarding test set}
+pred_df_test2 <- data.frame(trial = "trial2",
+                            accession = field2_test$accession, 
+                            measured = field2_test$LT50ACC,
+                            predicted_full = predict(field2T_regressionACC_factor, field2_testT_fac),
+                            predicted_reduced = predict(field2T_regressionACC_factor_red, field2_testT_fac))
+
+pred_df_test3 <- data.frame(trial = "trial3",
+                            accession = field3_test$accession, 
+                            measured = field3_test$LT50ACC,
+                            predicted_full = predict(field3T_regressionACC_factor, field3_testT_fac),
+                            predicted_reduced = predict(field3T_regressionACC_factor_red, field3_testT_fac))
+
+pred_df_test4 <- data.frame(trial = "trial4",
+                            accession = field4_test$accession, 
+                            measured = field4_test$LT50ACC,
+                            predicted_full = predict(field4T_regressionACC_factor, field4_testT_fac),
+                            predicted_reduced = predict(field4T_regressionACC_factor_red, field4_testT_fac))
+
+pred_df_test <- rbind(pred_df_test2, pred_df_test3, pred_df_test4)
+
+pred_df_test_ <- 
+  pred_df_test %>%
+  gather(key = "model", value = "predicted", 4:5)
+
+pred_df_test_2 <- 
+  pred_df_test %>%
+  gather(key = "model", value = "value", 3:5) %>%
+  droplevels()
+```
+
+## Correlation scatter plot
+```{r correlation test scatter plot}
+range(pred_df_test_$predicted)
+range(pred_df_test_$measured)
+lim_values <- c(-12.5, -5)
+
+sp_test <- ggscatter(pred_df_test_, x = "measured", y = "predicted",
+                add = "reg.line", 
+                add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+                conf.int = TRUE)
+
+sp_test_lim <- ggpar(sp_test, ylim = lim_values, xlim = lim_values)
+sp_test_facet <- facet(sp_test_lim + theme_bw(), facet.by = c("model","trial"))
+sp_test_final <- sp_test_facet + stat_cor(method = "pearson", label.x.npc = 'center', label.y.npc = 'top')
+
+ggsave(filename = "figures/predictions_test_corr_plot.png", 
+       plot = sp_test_final, width = 6, height = 4, dpi = 600)
+```
+
+## barplot of predicted LT50ACC
+```{r barplot of predicted LT50ACC}
+
+lt50_test <- lt50 %>% 
+  filter(Accession %in% accessions_testing) %>% 
+  droplevels() %>%
+  arrange(Accession)
+  
+
+pred_df_test_2$accession <- factor(pred_df_test_2$accession, 
+                                   levels = c(""))
+
+p_bar_test <- 
+  ggplot(pred_df_test_2) + 
+  geom_bar(aes(x = accession, y = value, fill = model),
+           position = "dodge", stat = "summary",  fun.y = "mean") +
+  facet_wrap(~ trial) + 
+  theme_pubr() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
 

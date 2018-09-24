@@ -31,6 +31,11 @@ library(lattice)
 library(gplots)
 library(pcaMethods)
 library(plyr)
+library(corrplot)
+library(psych)
+library(GGally)
+library(tidyverse)
+library(ggcorrplot)
 
 trellis.device() # zuruecksetzen auf default
 show.settings() # Farbeinstellungen usw. anzeigen
@@ -110,11 +115,11 @@ metabolite_arafield4$vegetative_state <- factor(metabolite_arafield4$vegetative_
 ```{r boxplots from lattice package LT50}
 pdf("figures/Metabolite_AraField_LT50_bwplots.pdf")   
 func_bw_plot(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants", 
-             xlab_text = expression("LT"[50]*"NAC in °C"))
+             xlab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants", 
-             xlab_text = expression("LT"[50]*"ACC in °C"))
+             xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot(metabolite_arafield4$capacity, title = "Acclimation capacity", 
-             xlab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+             xlab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -175,11 +180,11 @@ func_bw_plot_cat1(metabolite_arafield2$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield2$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield2$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield2$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -196,11 +201,11 @@ func_bw_plot_cat1(metabolite_arafield3$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield3$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield3$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield3$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -217,11 +222,11 @@ func_bw_plot_cat1(metabolite_arafield4$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield4$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -243,11 +248,11 @@ func_bw_plot_cat1(metabolite_arafield2$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield2$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield2$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield2$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -266,11 +271,11 @@ func_bw_plot_cat1(metabolite_arafield3$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield3$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield3$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield3$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -289,11 +294,11 @@ func_bw_plot_cat1(metabolite_arafield4$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield4$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -312,11 +317,11 @@ func_bw_plot_cat1(metabolite_arafield2$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield2$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield2$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield2$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$capacity, title = "Acclimation capacity",
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -333,11 +338,11 @@ func_bw_plot_cat1(metabolite_arafield3$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield3$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield3$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield3$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$capacity, title = "Acclimation capacity",
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -356,11 +361,11 @@ dev.off()
 # func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
 # func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
 # func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-#                   ylab_text = expression("LT"[50]*"NAC in °C"))
+#                   ylab_text = expression("LT"[50]*"NAC in ?C"))
 # func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
-#                   xlab_text = expression("LT"[50]*"ACC in °C"))
+#                   xlab_text = expression("LT"[50]*"ACC in ?C"))
 # func_bw_plot_cat1(metabolite_arafield4$capacity, title = "Acclimation capacity", 
-#                   ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+#                   ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 # dev.off()
 ```
 
@@ -379,11 +384,11 @@ func_bw_plot_cat1(metabolite_arafield2$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield2$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield2$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield2$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield2$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -400,11 +405,11 @@ func_bw_plot_cat1(metabolite_arafield3$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield3$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield3$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield3$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield3$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -421,11 +426,11 @@ func_bw_plot_cat1(metabolite_arafield4$malateT, title = "Malate")
 func_bw_plot_cat1(metabolite_arafield4$fumarateT, title = "Fumarate")
 func_bw_plot_cat1(metabolite_arafield4$prolineT, title = "Proline")
 func_bw_plot_cat1(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat1(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  xlab_text = expression("LT"[50]*"ACC in °C"))
+                  xlab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat1(metabolite_arafield4$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -446,11 +451,11 @@ func_bw_plot_cat2(metabolite_arafield2$malateT, title = "Malate")
 func_bw_plot_cat2(metabolite_arafield2$fumarateT, title = "Fumarate")
 func_bw_plot_cat2(metabolite_arafield2$prolineT, title = "Proline")
 func_bw_plot_cat2(metabolite_arafield2$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat2(metabolite_arafield2$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  ylab_text = expression("LT"[50]*"ACC in °C"))
+                  ylab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat2(metabolite_arafield2$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -469,11 +474,11 @@ func_bw_plot_cat2(metabolite_arafield3$malateT, title = "Malate")
 func_bw_plot_cat2(metabolite_arafield3$fumarateT, title = "Fumarate")
 func_bw_plot_cat2(metabolite_arafield3$prolineT, title = "Proline")
 func_bw_plot_cat2(metabolite_arafield3$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat2(metabolite_arafield3$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  ylab_text = expression("LT"[50]*"ACC in °C"))
+                  ylab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat2(metabolite_arafield3$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -492,11 +497,11 @@ func_bw_plot_cat2(metabolite_arafield4$malateT, title = "Malate")
 func_bw_plot_cat2(metabolite_arafield4$fumarateT, title = "Fumarate")
 func_bw_plot_cat2(metabolite_arafield4$prolineT, title = "Proline")
 func_bw_plot_cat2(metabolite_arafield4$LT50NAC, title = "Frost tolerance of non-acclimated plants",
-                  ylab_text = expression("LT"[50]*"NAC in °C"))
+                  ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_bw_plot_cat2(metabolite_arafield4$LT50ACC, title = "Frost tolerance of acclimated plants",
-                  ylab_text = expression("LT"[50]*"ACC in °C"))
+                  ylab_text = expression("LT"[50]*"ACC in ?C"))
 func_bw_plot_cat2(metabolite_arafield4$capacity, title = "Acclimation capacity", 
-                  ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+                  ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -508,11 +513,11 @@ dev.off()
 pdf("figures/Metabolite_AraField_LT50_Boxplots.pdf")
 par(mar=c(5.1, 5.1, 4.1, 2.1))
 func_boxplot_simple(lt50$LT50NAC, title = "Frost tolerance of non-acclimated plants", 
-             ylab_text = expression("LT"[50]*"NAC in °C"))
+             ylab_text = expression("LT"[50]*"NAC in ?C"))
 func_boxplot_simple(lt50$LT50ACC, title = "Frost tolerance of acclimated plants", 
-             ylab_text = expression("LT"[50]*"ACC in °C"))
+             ylab_text = expression("LT"[50]*"ACC in ?C"))
 func_boxplot_simple(lt50$Capacity, title = "Acclimation capacity", 
-             ylab_text = expression("decrease of LT"[50]*" in °C by acclimation"))
+             ylab_text = expression("decrease of LT"[50]*" in ?C by acclimation"))
 dev.off()
 ```
 
@@ -677,6 +682,94 @@ dev.off()
 ```
 
 
+# Correlation analysis
+```{r corr.test}
+cor_colnames <- c("LT50NAC", "LT50ACC", "capacity", nonNeg_colnames)
+# cor_labels <- c("LT50 \n NAC","LT50 \n ACC","Capa- \n city",
+#                 "Glc","Frc","Suc","Raf","AA","Mal","Fum","Pro")
+cor_labels <- c("LT50NAC","LT50ACC","Capacity",
+                "Glc","Frc","Suc","Raf","AA","Mal","Fum","Pro")
+
+cor_field2 <- corr.test(metabolite_arafield2[, cor_colnames], method = "pearson", adjust = "BH")
+cor_field3 <- corr.test(metabolite_arafield3[, cor_colnames], method = "pearson", adjust = "BH")
+cor_field4 <- corr.test(metabolite_arafield4[, cor_colnames], method = "pearson", adjust = "BH")
+
+rownames(cor_field2$p) <- colnames(cor_field2$p) <-
+  rownames(cor_field3$p) <- colnames(cor_field3$p) <-
+  rownames(cor_field4$p) <- colnames(cor_field4$p) <- cor_labels
+
+rownames(cor_field2$r) <- colnames(cor_field2$r) <-
+  rownames(cor_field3$r) <- colnames(cor_field3$r) <-
+  rownames(cor_field4$r) <- colnames(cor_field4$r) <- cor_labels
+```
+
+## Corrplot
+https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
+```{r corrplot}
+corrplot(cor = cor_field2$r, 
+         p.mat = cor_field2$p,
+         insig = "label_sig",
+         sig.level = c(.001,.01,.05), 
+         pch.cex = 1, 
+         pch.col = "white",
+         method = "circle",
+         order = "AOE",
+         tl.col = "black",
+         tl.cex = 1.2,
+         mar = c(1,0.5,2,0.5),
+         title = "average data",
+         type = "upper")
+
+corrplot.mixed(cor = cor_field2$r,
+               number.cex = 1,
+               tl.col = "black")
+
+corrplot(cor = cor_field2$r, 
+         p.mat = cor_field2$p, 
+         insig = "label_sig", 
+         sig.level = c(.001,.01,.05),
+         pch.cex = 1.4, 
+         tl.col = "black")
+```
+
+## ggcorrplot
+http://www.sthda.com/english/wiki/ggcorrplot-visualization-of-a-correlation-matrix-using-ggplot2
+```{r ggcorrplot}
+ggcorrplot(cor_field2$r, type = "upper", lab = TRUE, p.mat = cor_field2$p)
+
+ggcorrplot(cor_field2$r, type = "upper", p.mat = cor_field2$p, insig = "blank")
+ggcorrplot(cor_field3$r, type = "upper", p.mat = cor_field3$p, insig = "blank")
+ggcorrplot(cor_field4$r, type = "upper", p.mat = cor_field4$p, insig = "blank")
+
+p_field2 <- ggcorrplot(cor_field2$r, type = "upper", p.mat = cor_field2$p) + ggtitle("field 2007/08")
+p_field3 <- ggcorrplot(cor_field3$r, type = "upper", p.mat = cor_field3$p) + ggtitle("field 2008/09")
+p_field4 <- ggcorrplot(cor_field4$r, type = "upper", p.mat = cor_field4$p) + ggtitle("field 2009/10")
+
+p_all <- ggarrange(p_field2, p_field3, p_field4, ncol = 3, 
+                   common.legend = TRUE, legend = "right")
+
+ggsave(filename = "figures/corr_plot_all_fields.png", plot = p_all, width = 10, height = 4)
+```
+
+
+## ggcorr
+https://briatte.github.io/ggcorr/
+```{r ggcorr}
+ggcorr(cor_field2$r, hjust = 0.75, size = 5)
+ggcorr(cor_field2$r, hjust = 0.75, size = 5, label = T)
+
+ggcorr(cor_field3$r, hjust = 0.75, size = 5, label = T)
+ggcorr(cor_field4$r, hjust = 0.75, size = 5, label = T) +
+  geom_point(size = 10, aes(color = coefficient > 0, alpha = abs(coefficient) > 0.5)) +
+  scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
+  guides(color = FALSE, alpha = FALSE)
+
+cor_field3_merge <- 
+  ggcorr(cor_field3$r)$data %>%
+  left_join(ggcorr(cor_field3$p)$data, by = c("x","y"))
+```
+
+
 # Combine data of all field trials
 ```{r combine data of all field trials}
 combined_colnames <- c("versuch_id","accession", nonNeg_colnames)
@@ -748,26 +841,29 @@ func_barplot <- function(y_val, x_val = "Group.1", group_val = "Feld_Name", yaxi
     geom_bar(stat = "identity", fill = "black", width = 0.7) +
     facet_grid(Feld_Name ~ ., scales = "free_x")
   
-   p + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
-          strip.text.y = element_text(angle = 90),
-          panel.grid.minor.x=element_blank(),
-          panel.grid.major.x=element_blank(),
-          panel.grid.minor.y=element_blank()) +
+   p + theme_pubr() +
+     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+           strip.text.y = element_text(angle = 90),
+           panel.grid.minor.x=element_blank(),
+           panel.grid.major.x=element_blank(),
+           panel.grid.minor.y=element_blank()) +
      ylab(yaxis_text) + xlab("Accession") + 
      ggtitle(title_text)
 
 }
 
 # try out function
-func_barplot(y_val = "glucose_positive",
-            yaxis_text = expression(paste("Glucose (", mu, "mol g ", FW ^ -1, ")")),
-            title_text = "Glucose")
+p_glc <- func_barplot(y_val = "glucose_positive",
+                      yaxis_text = expression(paste("Glucose (", mu, "mol g ", FW ^ -1, ")")),
+                      title_text = "Glucose")
+
+p_glc
 
 title_names <- c("Glucose", "Fructose", "Sucrose", "Raffinose", "Amino Acids", "Malate", "Fumarate")
 names(title_names) <- colnames(metabolite_arafield_agg)[3:9]
 title_names
 
-pdf("figures/barplots_per_metabolite.pdf", width = 9, height = 6)
+pdf("figures/barplots_per_metabolite2.pdf", width = 12, height = 6)
 
 for(i in colnames(metabolite_arafield_agg)[3:9]) {
   print(func_barplot(y_val = i,
@@ -780,6 +876,20 @@ func_barplot(y_val = "proline_positive",
             title_text = "Proline")
 
 dev.off()
+
+
+for(i in colnames(metabolite_arafield_agg)[3:9]) {
+  p_per_met <- func_barplot(y_val = i,
+                            yaxis_text = expression(paste(mu, "mol g ", FW ^ -1)),
+                            title_text = title_names[i])
+  ggsave(paste0("figures/barplot_",i,".png"), p_per_met, dpi = 600, width = 12, height = 6)
+}
+
+p_pro <- func_barplot(y_val = "proline_positive",
+            yaxis_text = expression(paste("Proline (mg g ", FW ^ -1, ")")),
+            title_text = "Proline")
+
+ggsave("figures/barplot_proline_positive.png", p_pro, dpi = 600, width = 12, height = 6)
 
 ```
 
