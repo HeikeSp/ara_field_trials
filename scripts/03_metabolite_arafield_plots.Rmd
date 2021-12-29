@@ -10,6 +10,8 @@ output:
     toc: yes
     toc_float: true
     toc_depth: 4
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Set working directory  
@@ -772,9 +774,12 @@ cor_field3_merge <-
 
 # Combine data of all field trials
 ```{r combine data of all field trials}
-combined_colnames <- c("versuch_id","accession", nonNeg_colnames)
+# combined_colnames <- c("versuch_id","accession", nonNeg_colnames)
+combined_colnames <- c("versuch_id","accession", nonNeg_colnames, "bbch_categories")
+# combined_colnamesT <- c("versuch_id","accession","glucoseT","fructoseT","sucroseT", 
+#                         "raffinoseT","amino_acidsT","malateT","fumarateT","prolineT")
 combined_colnamesT <- c("versuch_id","accession","glucoseT","fructoseT","sucroseT", 
-                        "raffinoseT","amino_acidsT","malateT","fumarateT","prolineT")
+                        "raffinoseT","amino_acidsT","malateT","fumarateT","prolineT", "bbch_categories")
 
 # original values
 metabolite_arafield_all <- rbind(metabolite_arafield2[,combined_colnames],
@@ -797,9 +802,52 @@ metabolite_arafield_all$versuch_id <- factor(metabolite_arafield_all$versuch_id,
 metabolite_arafield_allT$versuch_id <- factor(metabolite_arafield_allT$versuch_id, 
                                              levels = c("43", "105", "119"))
 
+metabolite_arafield_allT$bbch_categories <- factor(metabolite_arafield_allT$bbch_categories, 
+                                             levels = c("vegetative", "generative buds", "flowering"))
+
 levels(metabolite_arafield_all$versuch_id) <- c("field2", "field3", "field4")
 levels(metabolite_arafield_allT$versuch_id) <- c("field2", "field3", "field4")
+
+metabolite_arafield_allTscaled <- rbind(field2_scaled, field3_scaled, field4_scaled)
+metabolite_arafield_allTscaled$trial <- c(rep("field2", nrow(field2_scaled)),
+                                          rep("field3", nrow(field3_scaled)),
+                                          rep("field4", nrow(field4_scaled))) %>% as.factor
+
+# add BBCH category
+metabolite_arafield_allTscaled$bbch_fac <- "generative buds"
+metabolite_arafield_allTscaled$bbch_fac[which(metabolite_arafield_allTscaled$bbch_id < 50)] <- "vegetative"
+metabolite_arafield_allTscaled$bbch_fac[which(metabolite_arafield_allTscaled$bbch_id > 59)] <- "flowering"
+metabolite_arafield_allTscaled$bbch_fac <- factor(metabolite_arafield_allTscaled$bbch_fac, 
+                                             levels = c("vegetative", "generative buds", "flowering"))
 ```
+
+
+## ANOVA per metabolite and BBCH category
+```{r ANOVA per metabolite and BBCH category}
+trial_names <- c("field2", "field3", "field4")
+
+anova_resT <- matrix(NA, nrow = 3, ncol = 8, 
+                    dimnames = list(trial_names, combined_colnamesT[3:10]))
+
+anova_res <- matrix(NA, nrow = 3, ncol = 8, 
+                    dimnames = list(trial_names, combined_colnames[3:10]))
+
+for(i in trial_names){
+  for(j in combined_colnamesT[3:10])
+  {
+    data_sub <- 
+      metabolite_arafield_allTscaled %>%
+      filter(trial == i) %>%
+      dplyr::select(bbch_fac, j)
+    
+    anova_resT[i,j] <- summary(aov(data_sub[,j] ~ data_sub$bbch_fac))[[1]][["Pr(>F)"]][1]
+  }
+}
+
+write.table(t(anova_resT), "output/anova_met_per_bbch_trial.txt", sep = "\t")
+```
+
+**USE ``anova_resT`` for paper!**
 
 ## Aggregate and scale all data
 + scaling means: columns (= metabolites) are scaled to mean of zero and sd of 1 (over all samples/rows)
@@ -893,6 +941,65 @@ ggsave("figures/barplot_proline_positive.png", p_pro, dpi = 600, width = 12, hei
 
 ```
 
+# Boxplot per metabolite and bbch category
+
+**use scaled values**
+
+```{r Boxplot per metabolite and bbch category}
+metabolite_arafield_allT_longer <- 
+  metabolite_arafield_allTscaled %>%
+  select(-plant_name, -bbch_id, -bbch_factor) %>%
+  pivot_longer(-c(trial, accession, bbch_fac, antho_value_en), 
+               names_to = "metabolite", values_to = "value")
+
+lt50_labs <- c(capacity = "Acclimation capacity",
+               LT50ACC = expression("LT"[50]*"ACC (°C)"),
+               LT50NAC = expression("LT"[50]*"NAC (°C)"))
+
+# version with bbch (fill) and trial on x
+bp1 <- metabolite_arafield_allT_longer %>%
+  filter(!is.na(bbch_fac)) %>%
+  filter(metabolite %in% c("LT50ACC", "LT50NAC", "capacity")) %>%
+  ggplot(., aes(fill = bbch_fac, y = value, x = trial)) +
+  geom_boxplot() + facet_wrap(~metabolite, scales = "free_y", labeller=labeller(metabolite = lt50_labs)) + 
+  labs(x = "field trial", y = "Temperature (°C)", fill = "Developmental stage") +
+  theme_bw()
+
+met_labs <- c("Amino acids", "Anthocyanin score", "Fructose", "Fumarate", 
+              "Glucose", "Malate", "Proline", "Raffinose", "Sucrose")
+names(met_labs) <- c("amino_acidsT", "anthoscore", "fructoseT", "fumarateT", 
+                     "glucoseT", "malateT", "prolineT", "raffinoseT", "sucroseT")
+
+bp2 <- metabolite_arafield_allT_longer %>%
+  filter(!is.na(bbch_fac)) %>%
+  filter(metabolite %in% c("anthoscore", "glucoseT", "fructoseT", "sucroseT",
+                           "raffinoseT", "amino_acidsT", "malateT", "fumarateT", "prolineT")) %>%
+  ggplot(., aes(fill = bbch_fac, y = value, x = trial)) +
+  geom_boxplot() + facet_wrap(~metabolite, scales = "free_y", labeller = labeller(metabolite = met_labs)) + 
+  labs(x = "field trial", y = "Scaled metabolite level", fill = "Developmental stage") +
+  theme_bw()
+
+ggsave(filename = "figures/boxplot_freezing_tolerance_per_trial_bbch.png", 
+       plot = bp1, width = 10, height = 3, dpi = 600)
+
+ggsave(filename = "figures/boxplot_metaboliteT_scaled_per_trial_bbch.png", 
+       plot = bp2, width = 10, height = 7, dpi = 600)
+
+# version with trial (fill) and bbch on x
+metabolite_arafield_allT_longer %>%
+  filter(!is.na(bbch_fac)) %>%
+  filter(metabolite %in% c("", "LT50NAC", "capacity")) %>%
+  ggplot(., aes(x = bbch_fac, y = value, fill = trial)) +
+  geom_boxplot() + facet_wrap(~metabolite, scales = "free")
+
+metabolite_arafield_allT_longer %>%
+  filter(!is.na(bbch_fac)) %>%
+  filter(metabolite %in% c("anthoscore", "glucoseT", "fructoseT", "sucroseT",
+                           "raffinoseT", "amino_acidsT", "malateT", "fumarateT", "prolineT")) %>%
+  ggplot(., aes(x = bbch_fac, y = value, fill = trial)) +
+  geom_boxplot() + facet_wrap(~metabolite, scales = "free")
+```
+
 
 # Heatmap
 ```{r heatmap, fig.width=10, fig.height=8}
@@ -942,8 +1049,12 @@ dev.off()
 
 
 # PCA
-```{r PCA}
-# aggregated scaled
+
+**Colour points in a plot differently depending on a vector of values**
+http://stackoverflow.com/questions/9946630/colour-points-in-a-plot-differently-depending-on-a-vector-of-values
+
+## PCA: aggregated scaled
+```{r PCA aggregated scaled}
 pca_data_agg_scaled <- prep(metabolite_arafield_agg_scaled, scale = "none")
 dim(pca_data_agg_scaled)
 pca_res_agg_scaled <- pca(pca_data_agg_scaled, method = "rnipals", nPcs = 5)
@@ -951,19 +1062,42 @@ pca_res_agg_scaled <- pca(pca_data_agg_scaled, method = "rnipals", nPcs = 5)
 plot(pca_res_agg_scaled@scores[,1], pca_res_agg_scaled@scores[,2], col = cols_trials[f_agg], pch = 19)
 legend("topleft", fill = cols_trials, c("field2", "field3", "field4"))
 
-metabolite_arafield_agg_scaled_lt50 <- merge(metabolite_arafield_agg_scaled, lt50, 
-                                             by.x = "row.names", by.y = "Accession", all = TRUE)
+# metabolite_arafield_agg_scaled_lt50 <- merge(metabolite_arafield_agg_scaled, lt50, 
+#                                              by.x = "row.names", by.y = "Accession", all = TRUE)
 
-# Colour points in a plot differently depending on a vector of values
-# http://stackoverflow.com/questions/9946630/colour-points-in-a-plot-differently-depending-on-a-vector-of-values
+pca_res_agg_scaled_meta <- 
+  pca_res_agg_scaled@scores %>%
+  as.data.frame %>%
+  mutate("Trial" = metabolite_arafield_agg$Group.2) %>%
+  mutate("Accession" = metabolite_arafield_agg$Group.1) %>%
+  left_join(lt50, by = "Accession")
+
 rbPal <- colorRampPalette(c('red','blue'))
-metabolite_arafield_agg_scaled_lt50$Color_ACC <- rbPal(10)[as.numeric(cut(metabolite_arafield_agg_scaled_lt50$LT50ACC,breaks = 10))]
+pca_res_agg_scaled_meta$Color_ACC <- rbPal(10)[as.numeric(cut(pca_res_agg_scaled_meta$LT50ACC,breaks = 10))]
+pca_res_agg_scaled_meta$Color_Cap <- rbPal(10)[as.numeric(cut(pca_res_agg_scaled_meta$Capacity,breaks = 10))]
 
-plot(pca_res_agg_scaled@scores[,1], pca_res_agg_scaled@scores[,2], col = metabolite_arafield_agg_scaled_lt50$Color_ACC, pch = 19)
+pairs(pca_res_agg_scaled_meta[,1:5], col = pca_res_agg_scaled_meta$Color_ACC, pch = 19)
+pairs(pca_res_agg_scaled_meta[,1:5], col = pca_res_agg_scaled_meta$Color_Cap, pch = 19)
+
+cor.test(pca_res_agg_scaled_meta$PC4, pca_res_agg_scaled_meta$LT50ACC)
+cor.test(pca_res_agg_scaled_meta$PC2, pca_res_agg_scaled_meta$LT50ACC)
+
+pca_res_agg_scaled_meta %>%
+  # filter(Trial == "field2") %>%
+  ggplot(., aes(x = PC2, y = PC4, colour = LT50ACC, label = Accession)) +
+  geom_point(size = 2.5, alpha = 0.7) + 
+  scale_color_gradient(low = "blue", high = "red", na.value = "grey70") + 
+                       # low = "#132B43", high = "#56B1F7",
+  facet_wrap(~Trial) +  
+  theme_bw()
 
 
+# plot(pca_res_agg_scaled@scores[,1], pca_res_agg_scaled@scores[,2], 
+#      col = metabolite_arafield_agg_scaled_lt50$Color_ACC, pch = 19)
+```
 
-# All scaled
+## PCA: All scaled
+```{r PCA All scaled}
 pca_data_all_scaled <- prep(metabolite_arafield_all_scaled, scale = "none")
 dim(pca_data_all_scaled)
 pca_res_all_scaled <- pca(pca_data_all_scaled, method = "rnipals", nPcs = 5)
@@ -971,17 +1105,54 @@ pca_res_all_scaled <- pca(pca_data_all_scaled, method = "rnipals", nPcs = 5)
 plot(pca_res_all_scaled@scores[,1], pca_res_all_scaled@scores[,2], col = cols_trials[f], pch = 19)
 legend("topleft", fill = cols_trials, c("field2", "field3", "field4"))
 
-metabolite_arafield_all_scaled_lt50 <- merge(metabolite_arafield_all_scaled, lt50, 
-                                             by.x = "row.names", by.y = "Accession", all = TRUE)
+metabolite_arafield_all_scaled_lt50 <-
+  metabolite_arafield_all_scaled %>%
+  as.data.frame %>%
+  mutate("Accession" = metabolite_arafield_all$accession) %>%
+  left_join(lt50, by = "Accession")
 
-# Colour points in a plot differently depending on a vector of values
-# http://stackoverflow.com/questions/9946630/colour-points-in-a-plot-differently-depending-on-a-vector-of-values
+# metabolite_arafield_all_scaled_lt50 <- merge(metabolite_arafield_all_scaled, lt50, 
+#                                              by.x = "row.names", by.y = "Accession", all = TRUE)
+
 rbPal <- colorRampPalette(c('red','blue'))
-metabolite_arafield_all_scaled_lt50$Color_ACC <- rbPal(10)[as.numeric(cut(metabolite_arafield_all_scaled_lt50$LT50ACC,breaks = 10))]
 
-plot(pca_res_all_scaled@scores[,1], pca_res_all_scaled@scores[,2], col = metabolite_arafield_all_scaled_lt50$Color_ACC, pch = 19)
+metabolite_arafield_all_scaled_lt50$Color_ACC <- 
+  rbPal(10)[as.numeric(cut(metabolite_arafield_all_scaled_lt50$LT50ACC,breaks = 10))]
+metabolite_arafield_all_scaled_lt50$Color_Cap <- 
+  rbPal(10)[as.numeric(cut(metabolite_arafield_all_scaled_lt50$Capacity,breaks = 10))]
 
-# original data
+plot(pca_res_all_scaled@scores[,1], pca_res_all_scaled@scores[,2], 
+     col = metabolite_arafield_all_scaled_lt50$Color_ACC, pch = 19)
+
+pca_res_all_scaled_meta <- 
+  pca_res_all_scaled@scores %>%
+  as.data.frame %>%
+  mutate("Trial" = metabolite_arafield_all$versuch_id) %>%
+  mutate("Color_ACC" = metabolite_arafield_all_scaled_lt50$Color_ACC) %>%
+  mutate("Color_Cap" = metabolite_arafield_all_scaled_lt50$Color_Cap) %>%
+  mutate("Accession" = metabolite_arafield_all$accession) %>%
+  left_join(lt50, by = "Accession")
+
+pairs(pca_res_all_scaled_meta[,1:5], col = pca_res_all_scaled_meta$Color_ACC, pch = 19)
+pairs(pca_res_all_scaled_meta[,1:5], col = pca_res_all_scaled_meta$Color_Cap, pch = 19)
+
+cor.test(pca_res_all_scaled_meta$PC5, pca_res_all_scaled_meta$LT50ACC)
+cor.test(pca_res_all_scaled_meta$PC2, pca_res_all_scaled_meta$LT50ACC)
+
+pca_res_all_scaled_meta %>%
+  # filter(Trial == "field2") %>%
+  ggplot(., aes(x = PC2, y = PC5, colour = LT50ACC, label = Accession)) +
+  geom_point(size = 2.5, alpha = 0.7) + 
+  scale_color_gradient(low = "blue", high = "red",
+    # low = "#132B43", high = "#56B1F7",
+    na.value = "grey70") +  
+  facet_wrap(~Trial) +
+  theme_bw()
+```
+
+
+## PCA: original data
+```{r PCA original data}
 pca_data_all <- prep(metabolite_arafield_all[,3:10], scale = "none")
 dim(pca_data_all)
 pca_res_all <- pca(pca_data_all, method = "rnipals", nPcs = 5)

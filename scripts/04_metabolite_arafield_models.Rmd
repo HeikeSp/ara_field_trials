@@ -10,13 +10,17 @@ output:
     toc: yes
     toc_float: true
     toc_depth: 4
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Set working directory  
 ```{r set working directory}
 #getwd()
-#setwd("D:/work/repos/ara_field_trials/")
-setwd("X:/mpimp/repos/ara_field_trials")
+# setwd("D:/work/repos/ara_field_trials/")
+# setwd("X:/mpimp/repos/ara_field_trials")
+setwd("E:/uschi-home-sync/uschi/Seafile/uschi-work/repos/ara_field_trials")
+setwd("/media/uschi/seagate/uschi-home-sync/uschi/Seafile/uschi-work/repos/ara_field_trials")
 ```
 
 # Load workspace, packages and scripts
@@ -33,24 +37,31 @@ library(glmnet)
 library(caret)
 library(tidyverse)
 library(ggpubr)
+library(lemon) # for coord_capped_cart
+library(RColorBrewer)
+library(ggrepel)
 
 # set options for knitr
 opts_chunk$set(fig.width=6, fig.height=5, tidy=TRUE, tidy.opts=list(width.cutoff=70))
 opts_knit$set(root.dir = '../')
 
 # load workspace
-#load("metabolite_arafield_model.RData")
+#load("metabolite_arafield_model_lt50_acc.RData")
+
+pal_grey <- c("black", "grey50", "grey75")
 ```
 
 
 # Source functions
 ```{r source functions}
 source("../functions/func_calc_loocv.R", encoding = 'UTF-8')
+source("../functions/func_calc_loocv_caret.R", encoding = 'UTF-8')
+source("../functions/func_pred_plot.R")
 ```
 
 
 # Load data
-Use changed metabolite data, from ``metabolite_arafield4_overview4.Rmd``
+Use changed metabolite data, from ``metabolite_arafield4_overview.Rmd``
 ```{r load data}
 field2 <- read.table("output/metabolite_arafield2_modified.txt", header = TRUE, sep = "\t")
 field3 <- read.table("output/metabolite_arafield3_modified.txt", header = TRUE, sep = "\t")
@@ -62,14 +73,14 @@ field4 <- read.table("output/metabolite_arafield4_modified.txt", header = TRUE, 
 # 58 accessions (= 52 accessions for training + 6 for testing)
 
 # NEW VERSION with 64 accessions
-lt50 <- read.table("data/lt50_64acc.txt", header = TRUE, sep = "\t")
+lt50 <- read.table("data/LT50_64acc.txt", header = TRUE, sep = "\t")
 dim(lt50)
 # 64 accessions (= 52 accessions for training + 12 for testing)
 table(lt50$Model)
 
 # capacity
 yCapacity4full <- field4$LT50ACC - field4$LT50NAC 
-yCapacity <- lt50$LT50ACC - lt50$LT50NAC
+lt50$Capacity <- lt50$LT50ACC - lt50$LT50NAC
 
 setdiff(lt50$Accession, field4$accession) # Ws missing in Field 4
 setdiff(lt50$Accession, field3$accession)
@@ -125,18 +136,18 @@ field4$vegetative_state <- factor(field4$vegetative_state, levels = c("vegetativ
 
 ## Remove missing values (NAs)
 ```{r remove missing values (NAs)}
-dim(field2)
-dim(field3)
-dim(field4)
+dim(field2) # 94
+dim(field3) # 162
+dim(field4) # 160
 
 field2 <- field2[which(!is.na(field2$sucrose_positive) ), ]
 field3 <- field3[which(!is.na(field3$fumarate_positive) ), ]
 # Field4-Tsu, SampleID: 837060, Plant: [At.Tsu-0.n].2.2-4 --> missing values for BBCH and antho-Score! --> remove?
 field4 <- field4[which(!is.na(field4$anthoscore) ), ]
 
-dim(field2)
-dim(field3)
-dim(field4)
+dim(field2) # 93
+dim(field3) # 160
+dim(field4) # 159
 ```
 
 
@@ -192,24 +203,6 @@ idx_unknown4 <- which(field4$accession %in% accessions_unknown)
 
 ## Define colnames
 ```{r define colnames}
-# with original BBCH
-model_colnames <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "capacity",
-                    "glucose_positive", "fructose_positive", "sucrose_positive",
-                    "raffinose_positive", "amino_acids_positive", "malate_positive", 
-                    "fumarate_positive", "proline_positive", "bbch_id", "anthoscore")
-
-# BBCH and antho_value as factors
-model_colnames_factor <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "capacity",
-                    "glucose_positive", "fructose_positive", "sucrose_positive",
-                    "raffinose_positive", "amino_acids_positive", "malate_positive", 
-                    "fumarate_positive", "proline_positive", "bbch_factor", "antho_value_en")
-
-# with NORMALIZED BBCH
-model_colnames_norm <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "capacity",
-                    "glucose_positive", "fructose_positive", "sucrose_positive",
-                    "raffinose_positive", "amino_acids_positive", "malate_positive", 
-                    "fumarate_positive", "proline_positive", "norm_bbch_id", "anthoscore")
-
 model_colnames_short <- c("accession", "plant_name", "LT50ACC", "LT50NAC", "cap",
                           "glc","frc","suc","raf","aa","mal","fum","pro","bbch","anthoscore")
 
@@ -226,68 +219,46 @@ model_colnamesT_factor[14:15] <- c("bbch_factor", "antho_value_en")
 ### Subset for model training/testing
 ```{r subset for model training/testing}
 # training set
-field2_train <- field2[idx_train2, model_colnames]
-field3_train <- field3[idx_train3, model_colnames]
-field4_train <- field4[idx_train4, model_colnames]
 field2_trainT <- field2_scaled[idx_train2, model_colnamesT]
 field3_trainT <- field3_scaled[idx_train3, model_colnamesT]
 field4_trainT <- field4_scaled[idx_train4, model_colnamesT]
 field2_trainT_fac <- field2_scaled[idx_train2, model_colnamesT_factor]
 field3_trainT_fac <- field3_scaled[idx_train3, model_colnamesT_factor]
 field4_trainT_fac <- field4_scaled[idx_train4, model_colnamesT_factor]
-field2_train_norm <- field2[idx_train2, model_colnames_norm]
-field3_train_norm <- field3[idx_train3, model_colnames_norm]
-field4_train_norm <- field4[idx_train4, model_colnames_norm]
 
 # testing set
-field2_test <- field2[idx_test2, model_colnames]
-field3_test <- field3[idx_test3, model_colnames]
-field4_test <- field4[idx_test4, model_colnames]
 field2_testT <- field2_scaled[idx_test2, model_colnamesT]
 field3_testT <- field3_scaled[idx_test3, model_colnamesT]
 field4_testT <- field4_scaled[idx_test4, model_colnamesT]
 field2_testT_fac <- field2_scaled[idx_test2, model_colnamesT_factor]
 field3_testT_fac <- field3_scaled[idx_test3, model_colnamesT_factor]
 field4_testT_fac <- field4_scaled[idx_test4, model_colnamesT_factor]
-field2_test_norm <- field2[idx_test2, model_colnames_norm]
-field3_test_norm <- field3[idx_test3, model_colnames_norm]
-field4_test_norm <- field4[idx_test4, model_colnames_norm]
 
 # all accessions
-field2_all <- field2[idx_all2, model_colnames]
-field3_all <- field3[idx_all3, model_colnames]
-field4_all <- field4[idx_all4, model_colnames]
-field2_all_fac <- field2[idx_all2, model_colnames_factor]
-field3_all_fac <- field3[idx_all3, model_colnames_factor]
-field4_all_fac <- field4[idx_all4, model_colnames_factor]
 field2_allT_fac <- field2_scaled[idx_all2, model_colnamesT_factor]
 field3_allT_fac <- field3_scaled[idx_all3, model_colnamesT_factor]
 field4_allT_fac <- field4_scaled[idx_all4, model_colnamesT_factor]
 
-
 # only accessions with unknown LT50
-field2_unknown <- field2[idx_unknown2, model_colnames]
-field3_unknown <- field3[idx_unknown3, model_colnames]
-field4_unknown <- field4[idx_unknown4, model_colnames]
-field2_unknown_fac <- field2[idx_unknown2, model_colnames_factor]
-field3_unknown_fac <- field3[idx_unknown3, model_colnames_factor]
-field4_unknown_fac <- field4[idx_unknown4, model_colnames_factor]
+field2_unknownT_fac <- field2_scaled[idx_unknown2, model_colnamesT_factor]
+field3_unknownT_fac <- field3_scaled[idx_unknown3, model_colnamesT_factor]
+field4_unknownT_fac <- field4_scaled[idx_unknown4, model_colnamesT_factor]
 
 # remove NA samples
-field2_train <- field2_train[which(!is.na(field2_train$sucrose_positive) ), ]
-field3_train <- field3_train[which(!is.na(field3_train$fumarate_positive) ), ]
-field3_test <- field3_test[which(!is.na(field3_test$fumarate_positive) ), ]
+# field2_trainT_fac <- field2_trainT_fac[which(!is.na(field2_trainT_fac$sucrose_positive) ), ]
+# field3_trainT_fac <- field3_trainT_fac[which(!is.na(field3_trainT_fac$fumarate_positive) ), ]
+# field3_testT_fac <- field3_testT_fac[which(!is.na(field3_testT_fac$fumarate_positive) ), ]
 
 # Field4-Tsu, SampleID: 837060, Plant: [At.Tsu-0.n].2.2-4 --> missing values for BBCH and antho-Score! --> remove?
-field4_train <- field4_train[which(!is.na(field4_train$anthoscore) ), ]
+# field4_trainT_fac <- field4_trainT_fac[which(!is.na(field4_trainT_fac$anthoscore) ), ]
 
-length(unique(field2_train$accession)) # 42 
-length(unique(field3_train$accession)) # 52/48 (with/without NAs for fumarate!)
-length(unique(field4_train$accession)) # 51
+length(unique(field2_trainT_fac$accession)) # 42 
+length(unique(field3_trainT_fac$accession)) # 52/48 (with/without NAs for fumarate!)
+length(unique(field4_trainT_fac$accession)) # 51
 
-length(unique(field2_test$accession)) # 6
-length(unique(field3_test$accession)) # 12/9 (with/without NAs for fumarate)
-length(unique(field4_test$accession)) # 12
+length(unique(field2_testT_fac$accession)) # 6
+length(unique(field3_testT_fac$accession)) # 12/9 (with/without NAs for fumarate)
+length(unique(field4_testT_fac$accession)) # 12
 ```
 
 
@@ -313,17 +284,17 @@ for(i in 1:8){
   idx_train4 <- which(field4$accession %in% c(folds_acc[-i,]))
   idx_test4 <- which(field4$accession %in% folds_acc[i,])
   
-  x_f4_train[[i]] <- field4[idx_train4, model_colnames[6:15]]
-  x_f4_test[[i]] <- field4[idx_test4, model_colnames[6:15]]
-  y_f4_train[[i]] <- field4[idx_train4, "LT50ACC"]
-  y_f4_test[[i]] <- field4[idx_test4, "LT50ACC"]
+  x_f4_train[[i]] <- field4_scaled[idx_train4, model_colnamesT_factor[6:15]]
+  x_f4_test[[i]] <- field4_scaled[idx_test4, model_colnamesT_factor[6:15]]
+  y_f4_train[[i]] <- field4_scaled[idx_train4, "LT50ACC"]
+  y_f4_test[[i]] <- field4_scaled[idx_test4, "LT50ACC"]
 }
 
-dim(f4_train[[1]])
-# 119 rows = observations, 15 columns
+dim(x_f4_train[[1]])
+# 117 rows = observations, 10 columns
 
-dim(f4_test[[1]])
-# 16 rows = observations, 15 columns
+dim(x_f4_test[[1]])
+# 18 rows = observations, 10 columns
 ```
 
 
@@ -344,125 +315,37 @@ dim(f4_test[[1]])
 
 
 ## Change colnames and export data
-- using ORIGINAL/NORMALIZED BBCH!
+- using transformed and scaled data
 ```{r change colnames and export data}
 # training data
-colnames(field2_train) <- colnames(field3_train) <- colnames(field4_train) <- model_colnames_short
-# using NORMALIZED BBCH
-colnames(field2_train_norm) <- colnames(field3_train_norm) <- colnames(field4_train_norm) <- model_colnames_short
-# transformed and scaled data
-colnames(field2_trainT) <- colnames(field3_trainT) <- colnames(field4_trainT) <- model_colnames_short
-colnames(field2_trainT_fac) <- colnames(field3_trainT_fac) <- colnames(field4_trainT_fac) <- model_colnames_short
-
+colnames(field2_trainT) <- colnames(field3_trainT) <- 
+  colnames(field4_trainT) <- model_colnames_short
+colnames(field2_trainT_fac) <- colnames(field3_trainT_fac) <- 
+  colnames(field4_trainT_fac) <- model_colnames_short
 # test data
-colnames(field2_test) <- colnames(field3_test) <- colnames(field4_test) <- model_colnames_short
-# using NORMALIZED BBCH
-colnames(field2_test_norm) <- colnames(field3_test_norm) <- colnames(field4_test_norm) <- model_colnames_short
-# transformed and scaled data
-colnames(field2_testT) <- colnames(field3_testT) <- colnames(field4_testT) <- model_colnames_short
-colnames(field2_testT_fac) <- colnames(field3_testT_fac) <- colnames(field4_testT_fac) <- model_colnames_short
-
+colnames(field2_testT) <- colnames(field3_testT) <- 
+  colnames(field4_testT) <- model_colnames_short
+colnames(field2_testT_fac) <- colnames(field3_testT_fac) <- 
+  colnames(field4_testT_fac) <- model_colnames_short
 # all accessions
-colnames(field2_all) <- colnames(field3_all) <- colnames(field4_all) <- model_colnames_short
-colnames(field2_all_fac) <- colnames(field3_all_fac) <- colnames(field4_all_fac) <- model_colnames_short
-colnames(field2_allT_fac) <- colnames(field3_allT_fac) <- colnames(field4_allT_fac) <- model_colnames_short
-
+colnames(field2_allT_fac) <- colnames(field3_allT_fac) <- 
+  colnames(field4_allT_fac) <- model_colnames_short
 # data for accessions of unknown LT50
-colnames(field2_unknown) <- colnames(field3_unknown) <- colnames(field4_unknown) <- model_colnames_short
-colnames(field2_unknown_fac) <- colnames(field3_unknown_fac) <- colnames(field4_unknown_fac) <- model_colnames_short
+colnames(field2_unknownT_fac) <- colnames(field3_unknownT_fac) <- 
+  colnames(field4_unknownT_fac) <- model_colnames_short
 
 # training data
-write.table(field2_train, "output/metabolite_arafield2_train.txt", sep="\t")
-write.table(field3_train, "output/metabolite_arafield3_train.txt", sep="\t")
-write.table(field4_train, "output/metabolite_arafield4_train.txt", sep="\t")
-write.table(field2_train_norm, "output/metabolite_arafield2_train_norm.txt", sep="\t")
-write.table(field3_train_norm, "output/metabolite_arafield3_train_norm.txt", sep="\t")
-write.table(field4_train_norm, "output/metabolite_arafield4_train_norm.txt", sep="\t")
+write.table(field2_trainT_fac, "output/metabolite_arafield2_trainT_fac.txt", sep="\t")
+write.table(field3_trainT_fac, "output/metabolite_arafield3_trainT_fac.txt", sep="\t")
+write.table(field4_trainT_fac, "output/metabolite_arafield4_trainT_fac.txt", sep="\t")
 # test data
-write.table(field2_test, "output/metabolite_arafield2_test.txt", sep="\t")
-write.table(field3_test, "output/metabolite_arafield3_test.txt", sep="\t")
-write.table(field4_test, "output/metabolite_arafield4_test.txt", sep="\t")
-write.table(field2_test_norm, "output/metabolite_arafield2_test_norm.txt", sep="\t")
-write.table(field3_test_norm, "output/metabolite_arafield3_test_norm.txt", sep="\t")
-write.table(field4_test_norm, "output/metabolite_arafield4_test_norm.txt", sep="\t")
+write.table(field2_testT_fac, "output/metabolite_arafield2_testT_fac.txt", sep="\t")
+write.table(field3_testT_fac, "output/metabolite_arafield3_testT_fac.txt", sep="\t")
+write.table(field4_testT_fac, "output/metabolite_arafield4_testT_fac.txt", sep="\t")
 ```
 
 
 # Linear Regression of LT50ACC (Training)
-## Use Normalized BBCH
-* Unterschied zwischen anova- und summary-Signifikanzen: erstere geben an, ob ein Effekt signifikant zur Erklaerung der Gesamtvarianz beitraegt.
-* zweitere ist "nur" ein Test, ob die Steigung signifikant unterschiedlich von null ist
-```{r regACC norm BBCH}
-field2_regressionACC_norm <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field2_train_norm)
-field3_regressionACC_norm <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field3_train_norm)
-field4_regressionACC_norm <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field4_train_norm)
-summary(field2_regressionACC_norm)$r.squared # Multiple R-squared: 0.356
-summary(field3_regressionACC_norm)$r.squared # Multiple R-squared: 0.298
-summary(field4_regressionACC_norm)$r.squared # Multiple R-squared: 0.361   
-
-# use FACTOR for antho_score and norm_bbch
-field2_regressionACC_norm_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                       factor(bbch) + factor(anthoscore), data = field2_train_norm)
-field3_regressionACC_norm_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                       factor(bbch) + factor(anthoscore), data = field3_train_norm)
-field4_regressionACC_norm_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                       factor(bbch) + factor(anthoscore), data = field4_train_norm)
-summary(field2_regressionACC_norm_factor)$r.squared # Multiple R-squared: 0.449
-summary(field3_regressionACC_norm_factor)$r.squared # Multiple R-squared: 0.358
-summary(field4_regressionACC_norm_factor)$r.squared # Multiple R-squared: 0.431 
-```
-
-
-## Use original BBCH - without factor
-```{r regACC original BBCH - without factor}
-field2_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                               bbch + anthoscore, data = field2_train)
-field3_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field3_train)
-field4_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field4_train)
-
-summary(field2_regressionACC)$r.squared # 0.350
-summary(field3_regressionACC)$r.squared # 0.286
-summary(field4_regressionACC)$r.squared # 0.405 
-```
-
-
-## Use original BBCH - with factor
-```{r regACC original BBCH - with factor}
-field2_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    factor(bbch) + factor(anthoscore), data = field2_train)
-field3_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    factor(bbch) + factor(anthoscore), data = field3_train)
-field4_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    factor(bbch) + factor(anthoscore), data = field4_train)
-
-summary(field2_regressionACC_factor)$r.squared # 0.449
-summary(field3_regressionACC_factor)$r.squared # 0.358
-summary(field4_regressionACC_factor)$r.squared # 0.431
-summary(field4_regressionACC_factor)$adj.r.squared # Adjusted R-squared: 0.301
-
-## --> identical to model with factor of normalized scores
-```
-
-## Use transformed and scaled data (without factor)
-```{r regACC transformed and scaled data}
-field2T_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                               bbch + anthoscore, data = field2_trainT)
-field3T_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field3_trainT)
-field4T_regressionACC <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field4_trainT)
-
-summary(field2T_regressionACC)$r.squared # 0.377
-summary(field3T_regressionACC)$r.squared # 0.273
-summary(field4T_regressionACC)$r.squared # 0.399
-```
-
-
 ## Use transformed and scaled data (with factor)
 ```{r regACC transformed and scaled data - with factor}
 field2T_regressionACC_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
@@ -476,8 +359,8 @@ summary(field2T_regressionACC_factor)$r.squared # 0.481
 summary(field3T_regressionACC_factor)$r.squared # 0.350
 summary(field4T_regressionACC_factor)$r.squared # 0.428
 
-cor(field4T_regressionACC_factor$fitted.values, field4_trainT$LT50ACC) # R = 0.654
-#predict(field4T_regressionACC_factor, field4_trainT[,6:15]) # equivalent to fitted.values
+cor(field4T_regressionACC_factor$fitted.values, field4_trainT_fac$LT50ACC) # R = 0.654
+#predict(field4T_regressionACC_factor, field4_trainT_fac[,6:15]) # equivalent to fitted.values
 ```
 
 ## Combine predictions across trials
@@ -521,36 +404,6 @@ ggsave(filename = "figures/predictions_train_corr_plot.png",
 
 
 # Linear Regression of LT50ACC (All Data)
-## Use original BBCH - without factor
-```{r regACC_all original BBCH - without factor}
-field2_regressionACC_all <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    bbch + anthoscore, data = field2_all)
-field3_regressionACC_all <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    bbch + anthoscore, data = field3_all)
-field4_regressionACC_all <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    bbch + anthoscore, data = field4_all)
-
-summary(field2_regressionACC_all)$r.squared # 0.367
-summary(field3_regressionACC_all)$r.squared # 0.279
-summary(field4_regressionACC_all)$r.squared # 0.384
-summary(field4_regressionACC_all)$adj.r.squared # Adjusted R-squared: 0.334
-```
-
-## Use original BBCH - with factor
-```{r regACC_all original BBCH - with factor}
-field2_regressionACC_all_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    bbch + anthoscore, data = field2_all_fac)
-field3_regressionACC_all_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    bbch + anthoscore, data = field3_all_fac)
-field4_regressionACC_all_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                    bbch + anthoscore, data = field4_all_fac)
-
-summary(field2_regressionACC_all_factor)$r.squared # 0.479
-summary(field3_regressionACC_all_factor)$r.squared # 0.394
-summary(field4_regressionACC_all_factor)$r.squared # 0.412
-summary(field4_regressionACC_all_factor)$adj.r.squared # Adjusted R-squared: 0.309
-```
-
 ## Use transformed and scaled data (with factor)
 ```{r regACC transformed and scaled data - with factor}
 field2T_regressionACC_all_factor <- lm(LT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
@@ -565,10 +418,11 @@ summary(field3T_regressionACC_all_factor)$r.squared # 0.394
 summary(field4T_regressionACC_all_factor)$r.squared # 0.410
 
 cor(field4T_regressionACC_all_factor$fitted.values, field4_allT_fac$LT50ACC) # R = 0.640
-#predict(field4T_regressionACC_all_factor, field4_allt_fac[,6:15]) # equivalent to fitted.values
+#predict(field4T_regressionACC_all_factor, field4_allT_fac[,6:15]) # equivalent to fitted.values
 ```
 
 # Apply models to different datasets (other trials)
+## All accessions
 ```{r apply models to different datasets ALL}
 field2T_regressionACC_all_factor$xlevels$bbch <- union(field2T_regressionACC_all_factor$xlevels$bbch,
                                                    union(levels(field3_allT_fac$bbch),
@@ -590,7 +444,8 @@ field2T_regressionACC_all_factor_pred3 <- predict(field2T_regressionACC_all_fact
 field2T_regressionACC_all_factor_pred4 <- predict(field2T_regressionACC_all_factor, field4_allT_fac[,6:15]) # 2>4
 ```
 
-```{r apply models to different datasets}
+## Training accessions
+```{r apply models to different datasets TRAINING}
 field2T_regressionACC_factor$xlevels$bbch <- union(field2T_regressionACC_factor$xlevels$bbch,
                                                    union(levels(field3_trainT_fac$bbch),
                                                          levels(field4_trainT_fac$bbch)))
@@ -611,26 +466,26 @@ field2T_regressionACC_factor_pred4 <- predict(field2T_regressionACC_factor, fiel
 
 ## Plot predicted vs. measured LT50ACC (across trials)
 ```{r plot predicted vs. measured LT50ACC (across trials)}
-plot(field2_trainT$LT50ACC, field3T_regressionACC_factor_pred2)
-cor(field2_trainT$LT50ACC, field3T_regressionACC_factor_pred2) # 0.45
+plot(field2_trainT_fac$LT50ACC, field3T_regressionACC_factor_pred2)
+cor(field2_trainT_fac$LT50ACC, field3T_regressionACC_factor_pred2) # 0.45
 cor(field2_allT_fac$LT50ACC, field3T_regressionACC_all_factor_pred2) # 0.48
 
-plot(field4_trainT$LT50ACC, field3T_regressionACC_factor_pred4)
-cor(field4_trainT$LT50ACC, field3T_regressionACC_factor_pred4) # 0.485
+plot(field4_trainT_fac$LT50ACC, field3T_regressionACC_factor_pred4)
+cor(field4_trainT_fac$LT50ACC, field3T_regressionACC_factor_pred4) # 0.485
 cor(field4_allT_fac$LT50ACC, field3T_regressionACC_all_factor_pred4) # 0.48
 
-plot(field3_trainT$LT50ACC, field4T_regressionACC_factor_pred3)
-cor(field3_trainT$LT50ACC, field4T_regressionACC_factor_pred3) # 0.413
+plot(field3_trainT_fac$LT50ACC, field4T_regressionACC_factor_pred3)
+cor(field3_trainT_fac$LT50ACC, field4T_regressionACC_factor_pred3) # 0.413
 cor(field3_allT_fac$LT50ACC, field4T_regressionACC_all_factor_pred3) # 0.46
 
-plot(field2_trainT$LT50ACC, field4T_regressionACC_factor_pred2)
-cor(field2_trainT$LT50ACC, field4T_regressionACC_factor_pred2)
+plot(field2_trainT_fac$LT50ACC, field4T_regressionACC_factor_pred2)
+cor(field2_trainT_fac$LT50ACC, field4T_regressionACC_factor_pred2)
 
-plot(field3_trainT$LT50ACC, field2T_regressionACC_factor_pred3)
-cor(field3_trainT$LT50ACC, field2T_regressionACC_factor_pred3)
+plot(field3_trainT_fac$LT50ACC, field2T_regressionACC_factor_pred3)
+cor(field3_trainT_fac$LT50ACC, field2T_regressionACC_factor_pred3)
 
-plot(field4_trainT$LT50ACC, field2T_regressionACC_factor_pred4)
-cor(field4_trainT$LT50ACC, field2T_regressionACC_factor_pred4)
+plot(field4_trainT_fac$LT50ACC, field2T_regressionACC_factor_pred4)
+cor(field4_trainT_fac$LT50ACC, field2T_regressionACC_factor_pred4)
 ```
 
 ## Combine predictions across trials
@@ -682,173 +537,55 @@ sp_final <- sp_facet + stat_cor(method = "pearson", label.x.npc = 'center', labe
 ggsave(filename = "figures/predictions_all_corr_plot.png", plot = sp_final, width = 7, height = 7)
 ```
 
-
-# Cross-validation
-## 5-fold CV
-```{r cross-validation}
-field2_DAAGdata <- field2_train[,c(3:15)]
-field3_DAAGdata <- field3_train[,c(3:15)]
-field4_DAAGdata <- field4_train[,c(3:15)]
-
-field2_DAAGdata_all <- field2_all[,c(3:15)]
-field3_DAAGdata_all <- field3_all[,c(3:15)]
-field4_DAAGdata_all <- field4_all[,c(3:15)]
-
-sum(is.na(field2_DAAGdata)) # 0
-sum(is.na(field3_DAAGdata)) # 0
-sum(is.na(field4_DAAGdata)) # 0
-
-# 5-fold cross-validation
-CVlm(data = field2_DAAGdata, form.lm = field2_regressionACC, m = 5) # overall ms: 3.55
-CVlm(data = field3_DAAGdata, form.lm = field3_regressionACC, m = 5) # overall ms: 2.77
-CVlm(data = field4_DAAGdata, form.lm = field4_regressionACC, m = 5) # Overall ms: 2.4
-
-# CVlm(data = field4_DAAGdata, form.lm = field4_regressionACC_factor, m = 5) # Overall ms: 2.44
-# not possible with factors!
-```
-
-
-## Leave-One-Out-cross-validation (LOO-CV)
-```{r Leave-One-Out-cross-validation (LOO-CV), warning=FALSE, message=FALSE}
-# training data
-field2_loocv <- CVlm(data = field2_DAAGdata, form.lm = field2_regressionACC, m = 76, printit = F)
-attr(field2_loocv, "ms") # Overall ms: 3.19
-plot(field2_loocv$LT50ACC, field2_loocv$cvpred)
-
-
-field3_loocv <- CVlm(data = field3_DAAGdata, form.lm = field3_regressionACC, m = 97, printit = F)
-attr(field3_loocv, "ms") # Overall ms: 2.64
-plot(field3_loocv$LT50ACC, field3_loocv$cvpred)
-
-
-field4_loocv <- CVlm(data = field4_DAAGdata, form.lm = field4_regressionACC, m = 109, printit = F)
-attr(field4_loocv, "ms") # Overall ms: 2.31
-cor.test(field4_loocv$LT50ACC, field4_loocv$cvpred)
-plot(field4_loocv$LT50ACC, field4_loocv$Predicted)
-#field4_loocv$Predicted equals field4_regressionACC$fitted.values
-
-
-# ALL data
-field2_all_loocv <- CVlm(data = field2_DAAGdata_all, form.lm = field2_regressionACC_all, m = 87, printit = F)
-attr(field2_all_loocv, "ms") # Overall ms: 2.89
-plot(field2_all_loocv$LT50ACC, field2_all_loocv$cvpred)
-
-field3_all_loocv <- CVlm(data = field3_DAAGdata_all, form.lm = field3_regressionACC_all, m = 114, printit = F)
-attr(field3_all_loocv, "ms") # Overall ms: 2.55
-plot(field3_all_loocv$LT50ACC, field3_all_loocv$cvpred)
-abline(0,1)
-
-field4_all_loocv <- CVlm(data = field4_DAAGdata_all, form.lm = field4_regressionACC_all, m = 135, printit = F)
-attr(field4_all_loocv, "ms") # Overall ms: 2.19
-plot(field4_all_loocv$LT50ACC, field4_all_loocv$cvpred)
-abline(0,1)
-```
-
-
 # Prediction of LT50ACC
-## Prediction of LT50ACC with model (for accessions that are included in the model = training data)
-```{r prediction of LT50ACC using factor model with ORIGINAL BBCH}
-cor.test(field2_regressionACC_factor$fitted.values, field2_train$LT50ACC) # R = 0.67
-cor.test(field3_regressionACC_factor$fitted.values, field3_train$LT50ACC) # R = 0.598
-cor.test(field4_regressionACC_factor$fitted.values, field4_train$LT50ACC) # R = 0.656 / R2 = 0.43
+## Prediction of LT50ACC training data
+```{r prediction of LT50ACC training data}
+cor.test(field2T_regressionACC_factor$fitted.values, field2_trainT_fac$LT50ACC) # R = 0.67
+cor.test(field3T_regressionACC_factor$fitted.values, field3_trainT_fac$LT50ACC) # R = 0.598
+cor.test(field4T_regressionACC_factor$fitted.values, field4_trainT_fac$LT50ACC) # R = 0.656 / R2 = 0.43
 
-plot(field2_train$LT50ACC, field2_regressionACC_factor$fitted.values, 
+plot(field2_trainT_fac$LT50ACC, field2T_regressionACC_factor$fitted.values, 
      ylab="LT50ACC fitted values", 
      xlab="LT50ACC measured values", 
      xlim=c(-12.5,-5), ylim=c(-12.5,-5), 
      pch = 19)
-abline(lm(field2_regressionACC_factor$fitted.values ~ field2_train$LT50ACC))
+abline(lm(field2T_regressionACC_factor$fitted.values ~ field2_trainT_fac$LT50ACC))
 
-plot(field3_train$LT50ACC, field3_regressionACC_factor$fitted.values, 
+plot(field3_trainT_fac$LT50ACC, field3T_regressionACC_factor$fitted.values, 
      ylab="LT50ACC fitted values", 
      xlab="LT50ACC measured values", 
      xlim=c(-12.5,-5), ylim=c(-12.5,-5), 
      pch = 19)
-abline(lm(field3_regressionACC_factor$fitted.values ~ field3_train$LT50ACC))
+abline(lm(field3T_regressionACC_factor$fitted.values ~ field3_trainT_fac$LT50ACC))
 
-plot(field4_train$LT50ACC, field4_regressionACC_factor$fitted.values, 
+plot(field4_trainT_fac$LT50ACC, field4T_regressionACC_factor$fitted.values, 
      ylab="LT50ACC fitted values", 
      xlab="LT50ACC measured values", 
      xlim=c(-12.5,-5), ylim=c(-12.5,-5), pch = 19)
-abline(lm(field4_regressionACC_factor$fitted.values ~ field4_train$LT50ACC))
+abline(lm(field4T_regressionACC_factor$fitted.values ~ field4_trainT_fac$LT50ACC))
 ```
-
-
-## Prediction of LT50ACC with model (for accessions that are included in the model = training data)
-```{r prediction of LT50ACC using model with ORIGINAL BBCH}
-cor.test(field2_regressionACC$fitted.values, field2_train$LT50ACC) # R = 0.592
-cor.test(field3_regressionACC$fitted.values, field3_train$LT50ACC) # R = 0.535
-cor.test(field4_regressionACC$fitted.values, field4_train$LT50ACC) # R = 0.636
-
-plot(field2_train$LT50ACC, field2_regressionACC$fitted.values, 
-     ylab="LT50ACC fitted values", 
-     xlab="LT50ACC measured values", 
-     xlim=c(-12.5,-5), ylim=c(-12.5,-5), 
-     pch = 19)
-abline(lm(field2_regressionACC$fitted.values ~ field2_train$LT50ACC))
-
-plot(field3_train$LT50ACC, field3_regressionACC_factor$fitted.values, 
-     ylab="LT50ACC fitted values", 
-     xlab="LT50ACC measured values", 
-     xlim=c(-12.5,-5), ylim=c(-12.5,-5), 
-     pch = 19)
-abline(lm(field3_regressionACC$fitted.values ~ field3_train$LT50ACC))
-
-plot(field4_train$LT50ACC, field4_regressionACC$fitted.values, 
-     ylab="LT50ACC fitted values", 
-     xlab="LT50ACC measured values", 
-     xlim=c(-12.5,-5), ylim=c(-12.5,-5), pch = 19)
-abline(lm(field4_regressionACC$fitted.values ~ field4_train$LT50ACC))
-```
-
 
 ## Prediction of LT50ACC test data
 ```{r prediction of LT50ACC for test data}
 # Vorhersage der LT50-Werte fuer ausgewaehlte Akzessionen mit Hilfe des berechneten Regressionsmodells
-field2_predictionACC <- predict(field2_regressionACC, field2_test[,6:15])
-field3_predictionACC <- predict(field3_regressionACC, field3_test[,6:15])
-field4_predictionACC <- predict(field4_regressionACC, field4_test[,6:15])
-
-field2T_predictionACC <- predict(field2T_regressionACC, field2_testT[,6:15])
-field3T_predictionACC <- predict(field3T_regressionACC, field3_testT[,6:15])
-field4T_predictionACC <- predict(field4T_regressionACC, field4_testT[,6:15])
-
-field2T_predictionACC_factor <- predict(field2T_regressionACC_factor, field2_testT[,6:15])
-field3T_predictionACC_factor <- predict(field3T_regressionACC_factor, field3_testT[,6:15])
-field4T_predictionACC_factor <- predict(field4T_regressionACC_factor, field4_testT[,6:15])
-
-field2_predictionACC_factor <- predict(field2_regressionACC_factor, field2_test[,6:15])
-field3_predictionACC_factor <- predict(field3_regressionACC_factor, field3_test[,6:15])
-field4_predictionACC_factor <- predict(field4_regressionACC_factor, field4_test[,6:15])
-
-field2_predictionACC_norm <- predict(field2_regressionACC_norm, field2_test_norm[,6:15])
-field3_predictionACC_norm <- predict(field3_regressionACC_norm, field3_test_norm[,6:15])
-field4_predictionACC_norm <- predict(field4_regressionACC_norm, field4_test_norm[,6:15])
-
-field2_predictionACC_norm_factor <- predict(field2_regressionACC_norm_factor, field2_test_norm[,6:15])
-field3_predictionACC_norm_factor <- predict(field3_regressionACC_norm_factor, field3_test_norm[,6:15])
-field4_predictionACC_norm_factor <- predict(field4_regressionACC_norm_factor, field4_test_norm[,6:15])
+field2T_predictionACC_factor <- predict(field2T_regressionACC_factor, field2_testT_fac[,6:15])
+field3T_predictionACC_factor <- predict(field3T_regressionACC_factor, field3_testT_fac[,6:15])
+field4T_predictionACC_factor <- predict(field4T_regressionACC_factor, field4_testT_fac[,6:15])
 ```
 
 ### Tables of predicted LT50ACC for test data
 ```{r tables of predicted LT50ACC for test data}
-field2_predictionACC_table <- data.frame(accession = field2_test$accession,
-                                         measured = field2_test$LT50ACC,
-                                         predicted = field2_predictionACC,
-                                         predicted_factor = field2_predictionACC_factor,
-                                         predicted_norm = field2_predictionACC_norm)
+field2_predictionACC_table <- data.frame(accession = field2_testT_fac$accession,
+                                         measured = field2_testT_fac$LT50ACC,
+                                         predicted = field2T_predictionACC_factor)
 
-field3_predictionACC_table <- data.frame(accession = field3_test$accession,
-                                         measured = field3_test$LT50ACC,
-                                         predicted = field3_predictionACC,
-                                         predicted_factor = field3_predictionACC_factor,
-                                         predicted_norm = field3_predictionACC_norm)
+field3_predictionACC_table <- data.frame(accession = field3_testT_fac$accession,
+                                         measured = field3_testT_fac$LT50ACC,
+                                         predicted = field3T_predictionACC_factor)
 
-field4_predictionACC_table <- data.frame(accession = field4_test$accession,
-                                         measured = field4_test$LT50ACC,
-                                         predicted = field4_predictionACC,
-                                         predicted_factor = field4_predictionACC_factor,
-                                         predicted_norm = field4_predictionACC_norm)
+field4_predictionACC_table <- data.frame(accession = field4_testT_fac$accession,
+                                         measured = field4_testT_fac$LT50ACC,
+                                         predicted = field4T_predictionACC_factor)
 
 head(field2_predictionACC_table)
 head(field3_predictionACC_table)
@@ -863,152 +600,161 @@ write.table(field4_predictionACC_table, "output/field4_predictionACC.txt", sep="
 ### Correlation of predicted and measured LT50ACC for test data
 ```{r correlation of predicted and measured LT50ACC for test data}
 # field 2
-cor(field2_test$LT50ACC, field2_predictionACC)
-cor(field2_test$LT50ACC, field2T_predictionACC)
-cor(field2_test$LT50ACC, field2T_predictionACC_factor)
-cor(field2_test$LT50ACC, field2_predictionACC_factor)
-cor(field2_test$LT50ACC, field2_predictionACC_norm)
-cor(field2_test$LT50ACC, field2_predictionACC_norm_factor)
-
+cor(field2_testT_fac$LT50ACC, field2T_predictionACC_factor)
 # field 3
-cor(field3_test$LT50ACC, field3_predictionACC)
-cor(field3_test$LT50ACC, field3T_predictionACC_factor)
-cor(field3_test$LT50ACC, field3_predictionACC_factor)
-cor(field3_test$LT50ACC, field3_predictionACC_norm)
-cor(field3_test$LT50ACC, field3_predictionACC_norm_factor)
-
+cor(field3_testT_fac$LT50ACC, field3T_predictionACC_factor)
 # field 4
-cor(field4_test$LT50ACC, field4_predictionACC)
-cor(field4_test$LT50ACC, field4T_predictionACC_factor)
-cor(field4_test$LT50ACC, field4_predictionACC_factor)
-cor(field4_test$LT50ACC, field4_predictionACC_norm)
-cor(field4_test$LT50ACC, field4_predictionACC_norm_factor)
+cor(field4_testT_fac$LT50ACC, field4T_predictionACC_factor)
 ```
 
 
 ### Difference between predicted and measured LT50 for test data
 ```{r difference between predicted and measured LT50 for test data}
-sum(((field4_predictionACC)-(field4_test$LT50ACC))^2)
-# 52.6
-sum(((field4_predictionACC_norm)-(field4_test$LT50ACC))^2)
-# 64.9
-sum(((field4_predictionACC_factor)-(field4_test$LT50ACC))^2)
-# 55.3
+sum(((field2T_predictionACC_factor)-(field2_testT_fac$LT50ACC))^2)
+# 14.5
+sum(((field2T_predictionACC_factor)-(field2_testT_fac$LT50ACC))^2) / sum((field2_testT_fac$LT50ACC)^2)
+# 0.0159
 
-sum(((field4_predictionACC)-(field4_test$LT50ACC))^2) / sum((field4_test$LT50ACC)^2)
-# 0.0232
-sum(((field4_predictionACC_norm)-(field4_test$LT50ACC))^2) / sum((field4_test$LT50ACC)^2)
-# 0.0286
+sum(((field3T_predictionACC_factor)-(field3_testT_fac$LT50ACC))^2)
+# 25.2
+sum(((field3T_predictionACC_factor)-(field3_testT_fac$LT50ACC))^2) / sum((field3_testT_fac$LT50ACC)^2)
+# 0.011
+
+sum(((field4T_predictionACC_factor)-(field4_testT_fac$LT50ACC))^2)
+# 58.5
+sum(((field4T_predictionACC_factor)-(field4_testT_fac$LT50ACC))^2) / sum((field4_testT_fac$LT50ACC)^2)
+# 0.0258
 ```
 
 
 ### Barplots of predicted LT50ACC for test data
 ```{r barplots of predicted LT50ACC for test data}
-plot(field4_test$LT50ACC, field4_predictionACC)
-plot(field4_test$LT50ACC, field4_predictionACC_factor)
+# plot(field4_testT_fac$LT50ACC, field4T_predictionACC_factor)
 
-barplot(t(as.matrix(field2_predictionACC_table[,c(2,4)])), 
+barplot(t(as.matrix(field2_predictionACC_table[,2:3])), 
         beside=T, names.arg = field2_predictionACC_table$accession, las=2)
 
-barplot(t(as.matrix(field3_predictionACC_table[,c(2,4)])), 
+barplot(t(as.matrix(field3_predictionACC_table[,2:3])), 
         beside=T, names.arg = field3_predictionACC_table$accession, las=2)
 
 barplot(t(as.matrix(field4_predictionACC_table[,2:3])), 
         beside=T, names.arg = field4_predictionACC_table$accession, las=2)
-
-barplot(t(as.matrix(field4_predictionACC_table[,c(2,4)])), 
-        beside=T, names.arg = field4_predictionACC_table$accession, las=2)
 ```
-
 
 ### Confidence interval
 ```{r confidence interval}
 # mehr zum Thema Vorhersage und Konfidenz-Intervalle im Kapitel 3 im Buch Regression, Seite 123
 # Vorhersage mit 95%-Vorhersageintervall
-head(predict(field4_regressionACC, field4_test, interval="prediction"))
+head(predict(field4T_regressionACC_factor, field4_testT_fac, interval="prediction"))
 # Vorhersage mit 95%-Konfidenzintervall
-head(predict(field4_regressionACC, field4_test, interval="confidence"))
+head(predict(field4T_regressionACC_factor, field4_testT_fac, interval="confidence"))
 ```
-
 
 # Accessions of unknown LT50
 ```{r accessions of unknown LT50}
 accessions_unknown
 
-field3_regressionACC_all_factor$xlevels$`bbch` <- union(field3_regressionACC_all_factor$xlevels$`bbch`,
-                                                        levels(field3_unknown$bbch))
+field3T_regressionACC_all_factor$xlevels$`bbch` <- union(field3T_regressionACC_all_factor$xlevels$`bbch`,
+                                                        levels(field3_unknownT_fac$bbch))
 
-field4_regressionACC_all_factor$xlevels$`bbch` <- union(field4_regressionACC_all_factor$xlevels$`bbch`,
-                                                        levels(field4_unknown$bbch))
+field4T_regressionACC_all_factor$xlevels$`bbch` <- union(field4T_regressionACC_all_factor$xlevels$`bbch`,
+                                                        levels(field4_unknownT_fac$bbch))
 
-field2_unknown_predictionACC_factor <- predict(field2_regressionACC_all_factor, field2_unknown_fac[,6:15])
-field3_unknown_predictionACC_factor <- predict(field3_regressionACC_all_factor, field3_unknown_fac[,6:15])
-field4_unknown_predictionACC_factor <- predict(field4_regressionACC_all_factor, field4_unknown_fac[,6:15])
-names(field2_unknown_predictionACC_factor) <- field2_unknown$accession
-names(field3_unknown_predictionACC_factor) <- field3_unknown$accession
-names(field4_unknown_predictionACC_factor) <- field4_unknown$accession
-
-field2_unknown_predictionACC <- predict(field2_regressionACC, field2_unknown[,6:15])
-field3_unknown_predictionACC <- predict(field3_regressionACC, field3_unknown[,6:15])
-field4_unknown_predictionACC <- predict(field4_regressionACC, field4_unknown[,6:15])
-names(field2_unknown_predictionACC) <- field2_unknown$accession
-names(field3_unknown_predictionACC) <- field3_unknown$accession
-names(field4_unknown_predictionACC) <- field4_unknown$accession
+field2T_unknown_predictionACC_factor <- predict(field2T_regressionACC_all_factor, field2_unknownT_fac[,6:15])
+field3T_unknown_predictionACC_factor <- predict(field3T_regressionACC_all_factor, field3_unknownT_fac[,6:15])
+field4T_unknown_predictionACC_factor <- predict(field4T_regressionACC_all_factor, field4_unknownT_fac[,6:15])
+names(field2T_unknown_predictionACC_factor) <- field2_unknownT_fac$accession
+names(field3T_unknown_predictionACC_factor) <- field3_unknownT_fac$accession
+names(field4T_unknown_predictionACC_factor) <- field4_unknownT_fac$accession
 ```
 
-
-# Reduced model
-```{r reduced model}
-summary(field2_regressionACC_factor)
-summary(field3_regressionACC_factor)
-summary(field4_regressionACC_factor)
-
-anova(field2_regressionACC_factor)
-anova(field3_regressionACC_factor)
-anova(field4_regressionACC_factor)
-
-# scaled and transformed data
-summary(field2T_regressionACC_factor)
-summary(field3T_regressionACC_factor)
-summary(field4T_regressionACC_factor)
-
+# ANOVA per model/trial
+```{r ANOVA per model}
+# training data
 anova(field2T_regressionACC_factor)
 anova(field3T_regressionACC_factor)
 anova(field4T_regressionACC_factor)
+# summary(field2T_regressionACC_factor)
+# summary(field3T_regressionACC_factor)
+# summary(field4T_regressionACC_factor)
+
+anova_resT_regressionACC_factor <- data.frame(field2 = anova(field2T_regressionACC_factor)[["Pr(>F)"]],
+                                              field3 = anova(field3T_regressionACC_factor)[["Pr(>F)"]],
+                                              field4 = anova(field4T_regressionACC_factor)[["Pr(>F)"]])
+rownames(anova_resT_regressionACC_factor) <- rownames(anova(field2T_regressionACC_factor))
+
+# all data
+anova(field2T_regressionACC_all_factor)
+anova(field3T_regressionACC_all_factor)
+anova(field4T_regressionACC_all_factor)
+# summary(field2T_regressionACC_all_factor)
+# summary(field3T_regressionACC_all_factor)
+# summary(field4T_regressionACC_all_factor)
+
+anova_resT_regressionACC_all_factor <- data.frame(field2 = anova(field2T_regressionACC_all_factor)[["Pr(>F)"]],
+                                              field3 = anova(field3T_regressionACC_all_factor)[["Pr(>F)"]],
+                                              field4 = anova(field4T_regressionACC_all_factor)[["Pr(>F)"]])
+rownames(anova_resT_regressionACC_all_factor) <- rownames(anova(field2T_regressionACC_all_factor))
+
+write.table(anova_resT_regressionACC_factor, "output/anova_resT_regressionACC_factor.txt", sep = "\t")
+write.table(anova_resT_regressionACC_all_factor, "output/anova_resT_regressionACC_all_factor.txt", sep = "\t")
 ```
 
+## Combine ANOVA p-values of all trials
+```{r Combine ANOVA of all trials}
+field2T_regressionACC_all_factor_anova <- 
+  # anova(field2T_regressionACC_factor)[1:10,] %>% 
+  anova(field2T_regressionACC_all_factor)[1:10,] %>% 
+  rownames_to_column("predictor") %>%
+  mutate(trial = "Field 2007/08")
 
+field3T_regressionACC_all_factor_anova <- 
+  # anova(field3T_regressionACC_factor)[1:10,] %>% 
+  anova(field3T_regressionACC_all_factor)[1:10,] %>% 
+  rownames_to_column("predictor") %>%
+  mutate(trial = "Field 2008/09")
 
-## Cp-plot
-```{r Cp-plot}
-################### Cp-Plot ####################
-x <- as.matrix(field4_train[,c(6:15)]) # Create design matrix x
-y <- field4_train$LT50ACC # Create response vector y
-leapsModels <- leaps(x, y, method="Cp", nbest=3, names=colnames(x))
+field4T_regressionACC_all_factor_anova <- 
+  # anova(field4T_regressionACC_factor)[1:10,] %>% 
+  anova(field4T_regressionACC_all_factor)[1:10,] %>% 
+  rownames_to_column("predictor") %>%
+  mutate(trial = "Field 2009/10")
 
-pdf(file="figures/Metabolite_AraField4_CpPlot.pdf")
-Cpplot(leapsModels)
-dev.off()
+# fieldT_regressionACC_factor_anova <-
+#   bind_rows(field2T_regressionACC_factor_anova,
+#             field3T_regressionACC_factor_anova,
+#             field4T_regressionACC_factor_anova)
 
-adjr <- leaps(x, y, method="adjr2") # Check which model the adjusted R2 selects
-maxadjr(adjr, 8)
+fieldT_regressionACC_all_factor_anova <-
+  bind_rows(field2T_regressionACC_all_factor_anova,
+            field3T_regressionACC_all_factor_anova,
+            field4T_regressionACC_all_factor_anova)
 
-# y <- arafield4_regressiondata$yLT50ACC[cooks.distance(arafield4_regressionACC)<0.2]
-# x <- cbind(arafield4_regressiondata[,4:14])
-# x_part <- x[cooks.distance(arafield4_regressionACC)<0.2,]
-# a <- leaps(x_part, y)
-# b <- leaps(x, y, method="adjr2")
+# colnames(fieldT_regressionACC_factor_anova)[6] <- "pvalue"
+colnames(fieldT_regressionACC_all_factor_anova)[6] <- "pvalue"
+
+# fieldT_regressionACC_factor_anova %>%
+#   ggplot(.) + geom_tile(aes(x = trial, y = predictor, fill = -log10(pvalue)))
+
+fieldT_regressionACC_all_factor_anova %>%
+  ggplot(.) + geom_tile(aes(x = trial, y = predictor, fill = -log10(pvalue)))
+
+# plot(-log10(fieldT_regressionACC_factor_anova$pvalue),-log10(fieldT_regressionACC_all_factor_anova$pvalue) )
+
+# for table in manuscript?
+# fieldT_regressionACC_factor_anova %>%
+#   dplyr::select(predictor, trial, pvalue) %>%
+#   pivot_wider(names_from = trial, values_from = pvalue, id_cols = "predictor") %>% View
 ```
-
 
 # LASSO model
 ## LASSO model field 3
 ```{r LASSO model field 3}
-x <- as.matrix(field3_train[,6:15])
-y <- field3_train$LT50ACC
+x <- as.matrix(field3_trainT[,6:15])
+y <- field3_trainT$LT50ACC
 
-test_x <- as.matrix(field3_test[,6:15])
-test_y <- field3_test$LT50ACC
+test_x <- as.matrix(field3_testT[,6:15])
+test_y <- field3_testT$LT50ACC
 
 set.seed(1)
 field3_lasso_ACC <- glmnet(x,y)
@@ -1046,17 +792,17 @@ field3_lasso_ACC_pred_test_lambda <- predict(field3_lasso_cv_ACC, new = test_x, 
 
 # number of variables in model (for lambda.min)
 which(field3_lasso_cv_ACC$lambda == field3_lasso_cv_ACC$lambda.min)
-# 38
-field3_lasso_cv_ACC$nzero[38]
-# 10
+# 24
+field3_lasso_cv_ACC$nzero[24]
+# 8
 
 # coefficients
-field3_lasso_cv_ACC$glmnet.fit$beta[,"s38"]
+field3_lasso_cv_ACC$glmnet.fit$beta[,"s23"]
 
 cor.test(y, field3_lasso_ACC_pred_all_lambda)
-# 0.534
+# 0.599
 cor.test(test_y, field3_lasso_ACC_pred_test_lambda)
-# 0.560
+# 0.582
 
 field3_lasso_ACC_pred_test_lambda_table <- data.frame(accession = field3_test$accession,
                                                       measured = field3_test$LT50ACC,
@@ -1181,215 +927,73 @@ abline(lm(field4_lasso_ACC_pred_all_lambda ~ field4_train$LT50ACC))
 
 # Variable selection
 
-## Forward selection
-```{r forward selection}
-# Create initial NULL model
-field2_regressionACC_null <- lm(field2_train$LT50ACC ~ 1, data = field2_train)
-field3_regressionACC_null <- lm(field3_train$LT50ACC ~ 1, data = field3_train)
-field4_regressionACC_null <- lm(field4_train$LT50ACC ~ 1, data = field4_train)
+**step is a slightly simplified version of stepAIC in package MASS (Venables & Ripley, 2002 and earlier editions).**
 
-field2T_regressionACC_null <- lm(field2_trainT$LT50ACC ~ 1, data = field2_trainT)
-field3T_regressionACC_null <- lm(field3_trainT$LT50ACC ~ 1, data = field3_trainT)
-field4T_regressionACC_null <- lm(field4_trainT$LT50ACC ~ 1, data = field4_trainT)
-
-# Choose a model by AIC in a Stepwise Algorithm
-# Forward
-field4_regressionACC_fw <- step(field4_regressionACC_null, 
-                                scope = formula(field4_regressionACC), 
-                                direction = "forward")
-
-# Step:  AIC=92.9
-# yLT50ACC ~ norm_bbch + raf + fum + suc
-#              Df Sum of Sq RSS  AIC
-# <none>                    233 92.9
-# + glc         1     2.340 231 93.8
-# + pro         1     2.281 231 93.8
-# + frc         1     2.266 231 93.8
-# + anthoscore  1     1.144 232 94.4
-# + antho       1     0.510 233 94.7
-# + aa          1     0.101 233 94.9
-# + mal         1     0.006 233 94.9
-
-summary(field4_regressionACC_fw)
-# R = 0.3912
-
-# Vorhersage-Werte fuer Oekotypen, die nicht im Modell sind
-predict(field4_regressionACC_fw, field4_test)
-
-# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert 
-sum(((predict(field4_regressionACC_fw, field4_test)) - (field4_test$LT50ACC))^2)
-# 51.4
-sum(((predict(field4_regressionACC_fw, field4_test)) - (field4_test$LT50ACC))^2)/ sum((field4_test$LT50ACC)^2)
-# 0.0227
+## Create initial NULL model
+```{r Create initial NULL model}
+field2T_regressionACC_fac_null <- lm(field2_trainT_fac$LT50ACC ~ 1, data = field2_trainT_fac)
+field3T_regressionACC_fac_null <- lm(field3_trainT_fac$LT50ACC ~ 1, data = field3_trainT_fac)
+field4T_regressionACC_fac_null <- lm(field4_trainT_fac$LT50ACC ~ 1, data = field4_trainT_fac)
 ```
 
 
-## stepAIC
-### default direction (if missing): backward!!!
-```{r selection in both directions}
-############  SELECTION in BOTH DIRECTIONS ###################
-# Without FACTOR!
-step(field4_regressionACC_null, 
-     scope = formula(field4_regressionACC_factor), 
-     direction = "both")
-# Step:  AIC=92.9
-# yLT50ACC ~ norm_bbch + raf + fum + suc
-# Call:
-# lm(formula = yLT50ACC ~ norm_bbch + raf + fum + suc, data = arafield4_regressiondata)
-# Coefficients:
-# (Intercept)    norm_bbch          raf          fum          suc  
-#     -7.2765       1.0280      -0.9556      -0.0720       0.0542  
+## Field2
+```{r variable selection field2}
+stepAIC(object = field2T_regressionACC_factor, scope = formula(field2T_regressionACC_factor), 
+        direction = "backward") # 72.58
+stepAIC(object = field2T_regressionACC_factor, scope = formula(field2T_regressionACC_factor), 
+        direction = "both") # 72.58
+stepAIC(object = field2T_regressionACC_fac_null, scope = formula(field2T_regressionACC_factor),
+        direction = "both") # 72.58
+stepAIC(object = field2T_regressionACC_fac_null, scope = formula(field2T_regressionACC_factor), direction = "forward") # 72.58
 
-# das selbe Modell wie bei forward selection
-
-# Both directions, starting from Null model (FACTOR!)
-field2_regressionACC_factorAIC <- step(field2_regressionACC_null, 
-                                       scope = formula(field2_regressionACC_factor), 
-                                       direction = "both")
-# raf, fum, mal
-
-field3_regressionACC_factorAIC <- step(field3_regressionACC_null, 
-                                       scope = formula(field3_regressionACC_factor), 
-                                       direction = "both")
-summary(field3_regressionACC_factorAIC)
-# factor(bbch), pro, raf, glc
-
-field4_regressionACC_factorAIC <- step(field4_regressionACC_null, 
-                                       scope = formula(field4_regressionACC_factor), 
-                                       direction = "both")
-summary(field4_regressionACC_factorAIC)
-# factor(bbch), raf, suc, fum
+step(object = field2T_regressionACC_factor, scope = formula(field2T_regressionACC_factor), 
+     direction = "backward") # 72.58
+step(object = field2T_regressionACC_factor, scope = formula(field2T_regressionACC_factor), 
+     direction = "both") # 72.58
+step(object = field2T_regressionACC_fac_null, scope = formula(field2T_regressionACC_factor), 
+     direction = "both") # 72.58
+step(object = field2T_regressionACC_fac_null, scope = formula(field2T_regressionACC_factor), 
+     direction = "forward") # 72.58
 
 
-# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
-sum(((predict(field4_regressionACC_factorAIC, field4_test)) - (field4_test$LT50ACC))^2) / sum((field4_test$LT50ACC)^2)
-# 0.0227
-sum(((predict(field4_regressionACC_factorAIC, field4_test)) - (field4_test$LT50ACC))^2)
-# 51.6
-
-# bind predicted and measured LT50ACC for accessions of test set
-head(data.frame(accession = field3_test$accession, 
-                measured = field3_test$LT50ACC,
-                predicted_reduced = predict(field3_regressionACC_factorAIC, field3_test),
-                predicted_full = predict(field3_regressionACC_factor, field3_test)))
-
-head(data.frame(accession = field4_test$accession, 
-                measured = field4_test$LT50ACC,
-                predicted_reduced = predict(field4_regressionACC_factorAIC, field4_test),
-                predicted_full = predict(field4_regressionACC_factor, field4_test)))
-```
-
-### transformed and scaled data: default direction (if missing): backward!!!
-```{r transformed and scaled data: selection in both directions}
-############  SELECTION in BOTH DIRECTIONS ###################
-# Both directions, starting from Null model (WITH FACTOR!)
-field2T_regressionACC_factorAIC <- step(field2T_regressionACC_null, 
-                                       scope = formula(field2T_regressionACC_factor), 
-                                       direction = "both")
-# raf, fum, mal
-
-field3T_regressionACC_factorAIC <- step(field3T_regressionACC_null, 
-                                       scope = formula(field3T_regressionACC_factor), 
-                                       direction = "both")
-summary(field3T_regressionACC_factorAIC)
-# factor(bbch), aa, suc
-
-field4T_regressionACC_factorAIC <- step(field4T_regressionACC_null, 
-                                       scope = formula(field4T_regressionACC_factor), 
-                                       direction = "both")
-summary(field4T_regressionACC_factorAIC)
-# factor(bbch), raf, suc
-
-
-# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
-sum(((predict(field4T_regressionACC_factorAIC, field4_testT)) - (field4_test$LT50ACC))^2) / sum((field4_test$LT50ACC)^2)
-# 0.0209
-sum(((predict(field4T_regressionACC_factorAIC, field4_testT)) - (field4_test$LT50ACC))^2)
-# 47.6
-
-# bind predicted and measured LT50ACC for accessions of test set
-head(data.frame(accession = field3_test$accession, 
-                measured = field3_test$LT50ACC,
-                predicted_reduced = predict(field3T_regressionACC_factorAIC, field3_testT),
-                predicted_full = predict(field3T_regressionACC_factor, field3_testT)))
-
-head(data.frame(accession = field4_test$accession, 
-                measured = field4_test$LT50ACC,
-                predicted_reduced = predict(field4T_regressionACC_factorAIC, field4_testT),
-                predicted_full = predict(field4T_regressionACC_factor, field4_testT)))
-```
-
-
-### stepAIC default
-#### default direction (if missing): backward!!!
-```{r stepAIC default}
-field4_stepAIC_ACC <- stepAIC(field4_regressionACC)
-field4_stepAIC_ACC$coefficients
-
-field2T_stepAIC_ACC_factor <- stepAIC(field2T_regressionACC_factor) # mal fum raf (AIC=72.58)
-field3T_stepAIC_ACC_factor <- stepAIC(field3T_regressionACC_factor) # fum pro glc raf (AIC=99.08)
-field4T_stepAIC_ACC_factor <- stepAIC(field4T_regressionACC_factor) # suc raf factor(bbch) (AIC=94.17)
-
-# predited values for accessions that are included in the null model (training data)
-# field4_stepAIC_ACC$fitted.values
-
-# predited values for accessions that are NOT included in the null model (test data)
-field4_prediction_stepAIC_ACC <- predict(field4_stepAIC_ACC, field4_test)
-
-field2T_prediction_stepAIC_ACC_factor <- predict(field2T_stepAIC_ACC_factor, field2_testT)
-field3T_prediction_stepAIC_ACC_factor <- predict(field3T_stepAIC_ACC_factor, field3_testT)
-field4T_prediction_stepAIC_ACC_factor <- predict(field4T_stepAIC_ACC_factor, field4_testT)
- 
-head(data.frame(accession = field4_test$accession, 
-                measured = field4_test$LT50ACC, 
-                predicted_reduced = field4_prediction_stepAIC_ACC,
-                predicted_full = predict(field4_regressionACC, field4_test)))
-
-# Summe der quadratischen Differenzen zwischen Mess- und Vorhersagewert
-sum(((field4_prediction_stepAIC_ACC) - (field4_test$LT50ACC))^2) # 51.4
-sum(((field4_prediction_stepAIC_ACC) - (field4_test$LT50ACC))^2)/ sum((field4_test$LT50ACC)^2) # 0.0227
-
-sum(((field4T_prediction_stepAIC_ACC_factor) - (field4_test$LT50ACC))^2) # 47.6
-sum(((field4T_prediction_stepAIC_ACC_factor) - (field4_test$LT50ACC))^2)/ sum((field4_test$LT50ACC)^2) # 0.0209
-sum(((predict(field4T_regressionACC_factor, field4_testT)) - (field4_test$LT50ACC))^2) # 54.1 (full model)
-```
-
-
-### comparison of two models --> ANOVA
-```{r comparison of two models}
-# anova(arafield4_regressionACC, arafield4_stepAIC_ACC)
-# Analysis of Variance Table
-# 
-# Model 1: yLT50ACC ~ glc + frc + suc + raf + aa + mal + fum + pro + antho + 
-#     norm_bbch + anthoscore
-# Model 2: yLT50ACC ~ frc + raf + fum + pro + norm_bbch
-#   Res.Df RSS Df Sum of Sq    F Pr(>F)
-# 1     97 223                         
-# 2    103 230 -6     -6.28 0.45   0.84
-
-# p-value > 0.05, also Annahme von H0, dass beide Modelle aehnlich
-```
-
-
-### backward selection
-```{r backward selection}
-step(object = field2T_regressionACC_factor, scope=formula(field2T_regressionACC_factor), direction="backward")
 field2T_regressionACC_factor_red <- step(object = field2T_regressionACC_factor, 
                                          scope = formula(field2T_regressionACC_factor), 
                                          direction = "both")
 # AIC=72.58, mal, raf, fum
+```
 
+## Field3
+```{r variable selection field3}
+stepAIC(object = field3T_regressionACC_factor, scope = formula(field3T_regressionACC_factor), direction = "backward") # 99.08
+stepAIC(object = field3T_regressionACC_factor, scope = formula(field3T_regressionACC_factor), direction = "both") # 99.08
+stepAIC(object = field3T_regressionACC_fac_null, scope = formula(field3T_regressionACC_factor), direction = "both") 
+# AIC=99.49, bbch + aa + suc
+stepAIC(object = field3T_regressionACC_fac_null, scope = formula(field3T_regressionACC_factor), direction = "forward") # 100.85
 
-step(object = field3T_regressionACC_factor, scope=formula(field3T_regressionACC_factor), direction="backward")
-# AIC=99.08, glc, raf, fum, pro --> minimal AIC (but small difference)
-field3T_regressionACC_factor_red <- step(object = field3T_regressionACC_null, 
+step(object = field3T_regressionACC_factor, scope = formula(field3T_regressionACC_factor), direction = "backward") # 99.08
+step(object = field3T_regressionACC_factor, scope = formula(field3T_regressionACC_factor), direction = "both") # 99.08
+step(object = field3T_regressionACC_fac_null, scope = formula(field3T_regressionACC_factor), direction = "both") # 99.49
+step(object = field3T_regressionACC_fac_null, scope = formula(field3T_regressionACC_factor), direction = "forward") # 100.85
+
+field3T_regressionACC_factor_red <- step(object = field3T_regressionACC_factor, 
                                          scope = formula(field3T_regressionACC_factor), 
                                          direction = "both")
-# AIC=99.49, suc, aa, factor(bbch)
-field3T_prediction_stepAIC_ACC_factor2 <- predict(field3T_regressionACC_factorAIC, field3_testT)
+# AIC=99.08, glc + raf + fum + pro
+```
 
+## Field4
+```{r variable selection field4}
+stepAIC(object = field4T_regressionACC_factor, scope = formula(field4T_regressionACC_factor), direction = "backward") # 94.17
+stepAIC(object = field4T_regressionACC_factor, scope = formula(field4T_regressionACC_factor), direction = "both") # 94.17
+stepAIC(object = field4T_regressionACC_fac_null, scope = formula(field4T_regressionACC_factor), direction = "both") # 94.17
+stepAIC(object = field4T_regressionACC_fac_null, scope = formula(field4T_regressionACC_factor), direction = "forward") # 94.17
 
-step(object = field4T_regressionACC_factor, scope=formula(field4T_regressionACC_factor), direction="backward")
+step(object = field4T_regressionACC_factor, scope = formula(field4T_regressionACC_factor), direction = "backward") # 94.17
+step(object = field4T_regressionACC_factor, scope = formula(field4T_regressionACC_factor), direction = "both") # 94.17
+step(object = field4T_regressionACC_fac_null, scope = formula(field4T_regressionACC_factor), direction = "both") # 94.17
+step(object = field4T_regressionACC_fac_null, scope = formula(field4T_regressionACC_factor), direction = "forward") # 94.17
+
 field4T_regressionACC_factor_red <- step(object = field4T_regressionACC_factor, 
                                          scope = formula(field4T_regressionACC_factor), 
                                          direction = "both")
@@ -1433,136 +1037,33 @@ sp_red <- ggscatter(pred_df_train_red, x = "measured", y = "predicted",
 
 sp_red_lim <- ggpar(sp_red, ylim = lim_values, xlim = lim_values)
 sp_red_facet <- facet(sp_red_lim + theme_bw(), facet.by = "data")
-sp_red_final <- sp_red_facet + stat_cor(method = "pearson", label.x.npc = 'center', label.y.npc = 'top')
+sp_red_final <- sp_red_facet + stat_cor(method = "pearson", label.x = -11, label.y.npc = 'top')
 
 ggsave(filename = "figures/predictions_train_reduced_corr_plot.png", 
        plot = sp_red_final, width = 10, height = 4, dpi = 600)
 ```
 
 
-### add quadratic term for norm_bbch
-#### increases R2 from 0.34 to 0.37
-```{r add quadratic term for norm_bbch}
-summary(lm(LT50ACC ~ frc + raf + fum + poly(bbch,2), data = field4_train_norm))
-# Adjusted R-squared:  0.345 
-
-testlm2 <- lm(I(1/LT50ACC) ~ frc + raf + fum + poly(bbch,2), data = field4_train_norm)
-summary(lm(I(1/LT50ACC) ~ frc + raf + fum + poly(bbch,2), data = field4_train_norm))
-# Adjusted R-squared: 0.39
-```
-
-
-### regression model for LT50NAC
-```{r regression model for LT50NAC}
-############## Regressionsmodell fuer LT50NAC #######################
-field4_regressionNAC <- lm(LT50NAC ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field4_train)
-
-summary(field4_regressionNAC)
-# Adjusted R-squared:  0.121
-
-# Vorhersage der LT50-Werte mit Hilfe des Modells (fuer Oekotypen, die im Modell enthalten sind)
-# field4_regressionNAC$fitted.values
-
-cor(field4_train$LT50NAC, field4_regressionNAC$fitted.values)
-# 0.45
-```
-
-
-### prediction of LT50NAC for test data
-```{r prediction of LT50NAC for test data}
-field4_predictionNAC <- predict(field4_regressionNAC, field4_test)
-
-head(data.frame(accession = field4_test$accession,
-                measured = field4_test$LT50NAC,
-                predicted = field4_predictionNAC))
-```
-
-
-### stepAIC for LT50NAC
-```{r stepAIC for LT50NAC}
-field4_stepAIC_NAC <- stepAIC(field4_regressionNAC)
-
-summary(field4_stepAIC_NAC)
-# Adjusted R-squared:  0.164 
-
-# fuer Oekotypen, die im Modell sind
-field4_stepAIC_NAC$fitted.values
-
-# fuer Oekotypen, die nicht im Modell sind
-field4_prediction_stepAIC_NAC <- predict(field4_stepAIC_NAC, field4_test)
-
-head(data.frame(accession = field4_test$accession,
-                measured = field4_test$LT50NAC,
-                predicted = field4_prediction_stepAIC_NAC))
-```
-
-
-### regression model for acclimation capacity
-```{r regression model for acclimation capacity}
-# yCapacity4
-
-field4_regressionCap <- lm(cap ~ glc + frc + suc + raf + aa + mal + fum + pro + 
-                                bbch + anthoscore, data = field4_train_norm)
-
-summary(field4_regressionCap)
-# Adjusted R-squared:  0.278 
-
-# Vorhersage der Kapazitaet mit Hilfe des Modells (fuer Oekotypen, die im Modell enthalten sind)
-# field4_regressionCap$fitted.values
-
-cor(field4_train_norm$cap, field4_regressionCap$fitted.values)
-# 0.587
-```
-
-
-### prediction of capacity for test data
-```{r prediction of capacity for test data}
-# Vorhersage der LT50-Werte fuer ausgewaehlte Akzessionen mit Hilfe des berechneten Regressionsmodells
-field4_predictionCap <- predict(field4_regressionCap, field4_test_norm)
-
-head(data.frame(accession = field4_test$accession,
-                measured = field4_test$cap,
-                predicted = field4_predictionCap))
-```
-
-
-### stepAIC for Capacity
-```{r stepAIC for Capacity}
-field4_stepAIC_Cap <- stepAIC(field4_regressionCap)
-
-summary(field4_stepAIC_Cap)
-# Adjusted R-squared:  0.305
-
-# fuer Oekotypen, die im Modell sind
-# field4_stepAIC_Cap$fitted.values
-
-# fuer Oekotypen, die nicht im Modell sind
-field4_prediction_stepAIC_Cap <- predict(field4_stepAIC_Cap, field4_test_norm)
-
-head(data.frame(accession = field4_test$accession,
-                measured = field4_test$cap,
-                predicted = field4_prediction_stepAIC_Cap))
-```
-
-
 # Model comparison regarding test set
 ```{r Model comparison regarding test set}
 pred_df_test2 <- data.frame(trial = "trial2",
-                            accession = field2_test$accession, 
-                            measured = field2_test$LT50ACC,
+                            data = "field2",
+                            accession = field2_testT_fac$accession, 
+                            measured = field2_testT_fac$LT50ACC,
                             predicted_full = predict(field2T_regressionACC_factor, field2_testT_fac),
                             predicted_reduced = predict(field2T_regressionACC_factor_red, field2_testT_fac))
 
 pred_df_test3 <- data.frame(trial = "trial3",
-                            accession = field3_test$accession, 
-                            measured = field3_test$LT50ACC,
+                            data = "field3",
+                            accession = field3_testT_fac$accession, 
+                            measured = field3_testT_fac$LT50ACC,
                             predicted_full = predict(field3T_regressionACC_factor, field3_testT_fac),
                             predicted_reduced = predict(field3T_regressionACC_factor_red, field3_testT_fac))
 
 pred_df_test4 <- data.frame(trial = "trial4",
-                            accession = field4_test$accession, 
-                            measured = field4_test$LT50ACC,
+                            data = "field4",
+                            accession = field4_testT_fac$accession, 
+                            measured = field4_testT_fac$LT50ACC,
                             predicted_full = predict(field4T_regressionACC_factor, field4_testT_fac),
                             predicted_reduced = predict(field4T_regressionACC_factor_red, field4_testT_fac))
 
@@ -1570,11 +1071,11 @@ pred_df_test <- rbind(pred_df_test2, pred_df_test3, pred_df_test4)
 
 pred_df_test_ <- 
   pred_df_test %>%
-  gather(key = "model", value = "predicted", 4:5)
+  gather(key = "model", value = "predicted", 5:6)
 
 pred_df_test_2 <- 
   pred_df_test %>%
-  gather(key = "model", value = "value", 3:5) %>%
+  gather(key = "model", value = "value", 4:6) %>%
   droplevels()
 ```
 
@@ -1591,171 +1092,408 @@ sp_test <- ggscatter(pred_df_test_, x = "measured", y = "predicted",
 
 sp_test_lim <- ggpar(sp_test, ylim = lim_values, xlim = lim_values)
 sp_test_facet <- facet(sp_test_lim + theme_bw(), facet.by = c("model","trial"))
-sp_test_final <- sp_test_facet + stat_cor(method = "pearson", label.x.npc = 'center', label.y.npc = 'top')
+sp_test_final <- sp_test_facet + stat_cor(method = "pearson", label.x = -12, label.y.npc = 'top')
 
 ggsave(filename = "figures/predictions_test_corr_plot.png", 
-       plot = sp_test_final, width = 6, height = 4, dpi = 600)
+       plot = sp_test_final, width = 7, height = 5, dpi = 600)
 ```
 
-## barplot of predicted LT50ACC
-```{r barplot of predicted LT50ACC}
-
+## Barplot of predicted LT50ACC
+```{r barplot of predicted LT50ACC test accessions}
 lt50_test <- lt50 %>% 
   filter(Accession %in% accessions_testing) %>% 
   droplevels() %>%
-  arrange(Accession)
-  
+  arrange(-LT50ACC) # decreasing order by LT50ACC
 
 pred_df_test_2$accession <- factor(pred_df_test_2$accession, 
-                                   levels = c(""))
+                                   levels = as.character(lt50_test$Accession))
+
+levels(pred_df_test_2$trial) <- c("Field 2007/08", "Field 2008/09", "Field 2009/10")
 
 p_bar_test <- 
   ggplot(pred_df_test_2) + 
   geom_bar(aes(x = accession, y = value, fill = model),
            position = "dodge", stat = "summary",  fun.y = "mean") +
+  scale_fill_manual(name = "", values = pal_grey,
+                    breaks = c("measured", "predicted_full", "predicted_reduced"),
+                    labels = c("measured", "predicted full model", "predicted reduced model")) +
+  theme_bw() + ylab(expression("LT"[50]*"ACC (°C)")) +
   facet_wrap(~ trial) + 
-  theme_pubr() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  # theme_pubr() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position = "bottom")
+
+ggsave(filename = "figures/predictions_test_barplot.png", 
+       plot = p_bar_test, width = 8, height = 5, dpi = 600)
+```
+
+## Mean and absolute difference per accession
+```{r Mean and absolute difference per test accession}
+pred_test_mean_df <- 
+  pred_df_test %>%
+  group_by(data,accession) %>%
+  summarise(pred_full_mean = mean(predicted_full),
+            pred_full_se = sd(predicted_full)/sqrt(length(predicted_full)),
+            pred_red_mean = mean(predicted_reduced),
+            pred_red_se = sd(predicted_reduced)/sqrt(length(predicted_reduced))) %>%
+  left_join(lt50, by = c("accession" = "Accession")) %>%
+  dplyr::select(-LT50NAC, -SE_LT50NAC, -Model, -Capacity) %>%
+  mutate(abs_diff_full = abs(pred_full_mean - LT50ACC)) %>%
+  mutate(abs_diff_red = abs(pred_red_mean - LT50ACC))
+```
+
+## Barplot of mean per accession (and error bars)
+```{r Barplot of mean per test accession}
+pred_test_mean_longer <-
+  pred_test_mean_df %>%
+  dplyr::select(-abs_diff_full, -abs_diff_red) %>%
+  dplyr::rename("mean_predictedFull" = pred_full_mean) %>%
+  dplyr::rename("se_predictedFull" = pred_full_se) %>%
+  dplyr::rename("mean_predictedRed" = pred_red_mean) %>%
+  dplyr::rename("se_predictedRed" = pred_red_se) %>%
+  dplyr::rename("mean_measured" = LT50ACC) %>%
+  dplyr::rename("se_measured" = SE_LT50ACC) %>%
+  pivot_longer(cols = -c(data, accession),
+               names_to = c(".value", "set"), 
+               names_pattern = "(.*)_(.*)") %>%
+  left_join(lt50[,c(1,3)], by = c("accession" = "Accession"))
+
+levels(pred_test_mean_longer$data) <- c("Field 2007/08", "Field 2008/09", "Field 2009/10")
+
+barplot_pred_test_mean <- 
+  pred_test_mean_longer %>%
+  ggplot(., aes(x = reorder(accession, -LT50ACC), y = mean, fill = set)) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                  width = 0.2,                    # Width of the error bars
+                  position=position_dodge(0.9)) +
+  facet_wrap(~data, ncol=3) +
+  scale_fill_manual(name  = "", values = pal_grey,
+                    breaks = c("measured", "predictedFull", "predictedRed"),
+                    labels = c("measured", "predicted full model", "predicted reduced model")) +
+  theme_bw() + xlab("accession") + 
+  ylab(expression("LT"[50]*"ACC (°C)")) +
+  theme(axis.text.x  = element_text(angle=90, hjust=1), legend.position = "bottom")
+
+ggsave(filename = "figures/predictions_test_barplot_error.png", 
+       plot = barplot_pred_test_mean, width = 8, height = 5, dpi = 600)
 ```
 
 
 # LOO-CV
+## Full model
 ```{r loo-cv field, warning=FALSE}
-field2_error_cv <- func_calc_loocv(field2)
-field3_error_cv <- func_calc_loocv(field3)
-field4_error_cv <- func_calc_loocv(field4)
+# full model
+field2_error_cv <- func_calc_loocv(field_data = field2_scaled)
+field3_error_cv <- func_calc_loocv(field_data = field3_scaled)
+field4_error_cv <- func_calc_loocv(field_data = field4_scaled)
 
-pairs(data.frame(field2_error_cv, field3_error_cv, field4_error_cv))
-pairs(data.frame(log(field2_error_cv), log(field3_error_cv), log(field4_error_cv)))
+field2_pred_cv <- func_calc_loocv(field2_scaled, return_val = "pred", data_name = "field2")
+field3_pred_cv <- func_calc_loocv(field3_scaled, return_val = "pred", data_name = "field3")
+field4_pred_cv <- func_calc_loocv(field4_scaled, return_val = "pred", data_name = "field4")
+
+pred_full_loocv_df <- rbind(field2_pred_cv, field3_pred_cv, field4_pred_cv)
+
+range(pred_full_loocv_df$predicted)
+range(pred_full_loocv_df$measured)
+lim_values <- c(-12.5, -5)
+
+sp_loocv <- ggscatter(pred_full_loocv_df, x = "measured", y = "predicted",
+                add = "reg.line", 
+                add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+                conf.int = TRUE)
+
+sp_loocv_lim <- ggpar(sp_loocv, ylim = lim_values, xlim = lim_values)
+sp_loocv_facet <- facet(sp_loocv_lim + theme_bw(), facet.by = "data")
+sp_loocv_final <- sp_loocv_facet + stat_cor(method = "pearson", label.x.npc = 'center', label.y.npc = 'top')
+
+ggsave(filename = "figures/predictions_loocv_corr_plot.png", 
+       plot = sp_loocv_final, width = 10, height = 4, dpi = 600)
 ```
 
-# compare different models
-```{r plot function for comparison}
-func_pred_plot <- function(x, y, main_text, limits = lim_values, labels){
-  plot(x, y, col = "white", main = main_text, 
-       xlim = limits, ylim = limits)
-  
-  text(x, y, labels)
-  text(-10, -6, paste("cor = ", round(cor(x, y), digits = 3)), col = "red")
-  abline(0, 1, col = "red")
-  
-  print(cor.test(x, y))
-}
+### Mean per accession for LT50 (pred vs measured)
+```{r loo-cv field mean per accession, warning=FALSE}
+pred_full_loocv_mean_df <- 
+  pred_full_loocv_df %>%
+  group_by(data,accession) %>%
+  summarise(predicted_mean = mean(predicted),
+            predicted_se = sd(predicted)/sqrt(length(predicted)),
+            predicted_n = length(predicted)) %>%
+  left_join(lt50, by = c("accession" = "Accession")) %>%
+  dplyr::select(-LT50NAC, -SE_LT50NAC, -Model, -Capacity) %>%
+  dplyr::rename("predicted" = "predicted_mean") %>%
+  dplyr::rename("measured" = "LT50ACC") %>%
+  mutate(abs_diff = abs(predicted - measured))
+
+range(pred_full_loocv_mean_df$predicted)
+range(pred_full_loocv_mean_df$measured)
+lim_values <- c(-12.5, -5)
+
+sp_loocv_mean <- ggscatter(pred_full_loocv_mean_df, x = "measured", y = "predicted",
+                           add = "reg.line", 
+                           add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+                           conf.int = TRUE)
+
+sp_loocv_mean_lim <- ggpar(sp_loocv_mean, ylim = lim_values, xlim = lim_values)
+sp_loocv_mean_facet <- facet(sp_loocv_mean_lim + theme_bw(), facet.by = "data")
+sp_loocv_mean_final <- sp_loocv_mean_facet + stat_cor(method = "pearson", label.x = -11, label.y.npc = 'top')
+
+ggsave(filename = "figures/predictions_loocv_corr_plot_mean.png", 
+       plot = sp_loocv_mean_final, width = 10, height = 4, dpi = 600)
 ```
 
-## compare different models field 2
-```{r compare different models field 2}
-test_y <- field2_test$LT50ACC
-range(test_y)
-lim_values <- c(-11.5, -5.5)
+## Reduced model
+### Field2
+```{r LOO-CV reduced model field2}
+field2_sel_vars <- variable.names(field2T_regressionACC_factor_red)[-1]
+field2_sel_varsT <- c(model_colnamesT_factor[1:5], "raffinoseT", "malateT", "fumarateT")
+field2_sel_vars_short <- c(model_colnames_short[1:5], field2_sel_vars)
+field2_formula <- as.formula(paste("LT50ACC", paste(field2_sel_vars, collapse = " + "), sep = " ~ "))
+print(field2_formula) # LT50ACC ~ raf + mal + fum
 
-pdf("figures/field2_compare_model_validation.pdf", 8, 8)
-par(mfrow=c(2,2))
+field2_red_pred_cv <- func_calc_loocv(field_data = field2_scaled, return_val = "pred", 
+                                      data_name = "field2", 
+                                      colnames_short = field2_sel_vars_short, 
+                                      colnamesT_factor = field2_sel_varsT, 
+                                      formula = field2_formula)
+```
 
-func_pred_plot(x = test_y,
-               y = field2_lasso_ACC_pred_test_lambda,
-               main_text = "lasso model",
-               labels = field2_test$accession)
+### Field3
+```{r LOO-CV reduced model field3}
+# field3T_regressionACC_factor_red
+# glc + raf + fum + pro
+field3_sel_vars <- c("glc", "raf", "fum", "pro")
+field3_sel_varsT <- c(model_colnamesT_factor[1:5], "glucoseT", "raffinoseT", "fumarateT", "prolineT")
 
-func_pred_plot(x = test_y,
-               y = field2T_predictionACC_factor,
-               main_text = "full reg model with scaled data",
-               labels = field2_testT$accession)
+# alternative:
+# field3T_regressionACC_factorAIC
+# factor(bbch) + aa + suc
+# field3_sel_vars <- c("bbch", "aa", "suc")
+# field3_sel_varsT <- c(model_colnamesT_factor[1:5], "bbch_factor", "amino_acidsT", "sucroseT")
+field3_sel_vars_short <- c(model_colnames_short[1:5], field3_sel_vars)
 
-func_pred_plot(x = test_y,
-               y = field2T_prediction_stepAIC_ACC_factor,
-               main_text = "reduced reg model with scaled data",
-               labels = field2_testT$accession)
+# field3_formula <- as.formula(paste("LT50ACC ~ bbch + aa + suc"))
+field3_formula <- as.formula(paste("LT50ACC ~ glc + raf + fum + pro"))
+print(field3_formula) # LT50ACC ~ glc + raf + fum + pro
 
-func_pred_plot(x = test_y,
-               y = field2_predictionACC_factor,
-               main_text = "full reg model (factor)",
-               labels = field2_test$accession)
-dev.off()
+field3_red_pred_cv <- func_calc_loocv(field_data = field3_scaled, return_val = "pred", 
+                                      data_name = "field3", 
+                                      colnames_short = field3_sel_vars_short, 
+                                      colnamesT_factor = field3_sel_varsT, 
+                                      formula = field3_formula)
+```
+
+### Field4
+```{r LOO-CV reduced model field4}
+# field4T_regressionACC_factor_red
+field4_sel_vars <- c("bbch", "raf", "suc")
+field4_sel_varsT <- c(model_colnamesT_factor[1:5], "bbch_factor", "raffinoseT", "sucroseT")
+field4_sel_vars_short <- c(model_colnames_short[1:5], field4_sel_vars)
+field4_formula <- as.formula(paste("LT50ACC", paste(field4_sel_vars, collapse = " + "), sep = " ~ "))
+print(field4_formula) # LT50ACC ~ bbch + raf + suc
+
+field4_red_pred_cv <- func_calc_loocv(field_data = field4_scaled, return_val = "pred", 
+                                      data_name = "field4", 
+                                      colnames_short = field4_sel_vars_short, 
+                                      colnamesT_factor = field4_sel_varsT, 
+                                      formula = field4_formula)
+```
+
+### Mean per accession (reduced model)
+```{r Mean per accession (reduced model)}
+pred_red_loocv_df <- rbind(field2_red_pred_cv, field3_red_pred_cv, field4_red_pred_cv)
+
+pred_red_loocv_mean_df <- 
+  pred_red_loocv_df %>%
+  group_by(data,accession) %>%
+  summarise(predicted_mean = mean(predicted),
+            predicted_se = sd(predicted)/sqrt(length(predicted)),
+            predicted_n = length(predicted)) %>%
+  left_join(lt50, by = c("accession" = "Accession")) %>%
+  dplyr::select(-LT50NAC, -SE_LT50NAC, -Model, -Capacity)
+
+colnames(pred_red_loocv_mean_df)[3] <- "predicted"
+colnames(pred_red_loocv_mean_df)[6] <- "measured"
+
+pred_red_loocv_mean_df$abs_diff <- abs(pred_red_loocv_mean_df$predicted - pred_red_loocv_mean_df$measured)
+
+pred_red_loocv_df$model <- "prediction (reduced model)"
+pred_full_loocv_df$model <- "prediction (full model)"
+```
+
+### Combine full and reduced model
+```{r Mean combine full and reduced model}
+pred_all_loocv_df <- rbind(pred_full_loocv_df, pred_red_loocv_df)
+
+pred_all_loocv_mean_df <- 
+  pred_all_loocv_df %>%
+  group_by(data,model,accession) %>%
+  summarise(predicted_mean = mean(predicted),
+            predicted_se = sd(predicted)/sqrt(length(predicted)),
+            predicted_n = length(predicted)) %>%
+  left_join(lt50, by = c("accession" = "Accession")) %>%
+  dplyr::select(-LT50NAC, -SE_LT50NAC, -Model, -Capacity)
+
+colnames(pred_all_loocv_mean_df)[4] <- "predicted"
+colnames(pred_all_loocv_mean_df)[7] <- "measured"
+
+pred_all_loocv_mean_df$abs_diff <- abs(pred_all_loocv_mean_df$predicted - pred_all_loocv_mean_df$measured)
+
+range(pred_all_loocv_mean_df$predicted)
+range(pred_all_loocv_mean_df$measured)
+lim_values <- c(-12.5, -5)
+
+sp_all_loocv_mean <- ggscatter(pred_all_loocv_mean_df, x = "measured", y = "predicted",
+                           add = "reg.line", 
+                           add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+                           conf.int = TRUE)
+
+sp_all_loocv_mean_lim <- ggpar(sp_all_loocv_mean, ylim = lim_values, xlim = lim_values)
+sp_all_loocv_mean_facet <- facet(sp_all_loocv_mean_lim + theme_bw(), facet.by = c("model","data"))
+sp_all_loocv_mean_final <- sp_all_loocv_mean_facet + stat_cor(method = "pearson", label.x = -11, label.y.npc = 'top')
+
+ggsave(filename = "figures/predictions_loocv_corr_plot_mean_full_red.png", 
+       plot = sp_all_loocv_mean_final, width = 10, height = 7, dpi = 600)
 ```
 
 
-## compare different models field 3
-```{r compare different models field 3}
-test_y <- field3_test$LT50ACC
-range(test_y)
-lim_values <- c(-11.5, -5.5)
 
-pdf("figures/field3_compare_model_validation.pdf", 8, 8)
-par(mfrow=c(2,2))
+## Plot of absolute difference between pred and measured
+```{r Plot of absolute difference between pred and measured}
+plot_abs_diff <- 
+  pred_full_loocv_mean_df %>%
+  ggplot(., aes(x = measured, y = abs_diff)) + 
+  geom_point() + facet_wrap(~data) +
+  geom_smooth()
 
-func_pred_plot(x = test_y,
-               y = field3_lasso_ACC_pred_test_lambda,
-               main_text = "lasso model",
-               labels = field3_test$accession)
+ggsave(filename = "figures/predictions_loocv_abs_diff.png", 
+       plot = plot_abs_diff, width = 8, height = 5, dpi = 600)
 
-# func_pred_plot(x = test_y,
-#                y = field3_predictionACC,
-#                main_text = "regression model",
-#                labels = field3_test$accession)
+# with accession names as labels
+plot_abs_diff2 <- 
+  pred_full_loocv_mean_df %>%
+  ggplot(., aes(x = measured, y = abs_diff, label = accession)) + 
+  geom_point() + facet_wrap(~data) +
+  geom_smooth() +
+  geom_text_repel() 
 
-func_pred_plot(x = test_y,
-               y = field3T_predictionACC_factor,
-               main_text = "full reg model with scaled data",
-               labels = field3_testT$accession)
+ggsave(filename = "figures/predictions_loocv_abs_diff_label.png", 
+       plot = plot_abs_diff2, width = 15, height = 8, dpi = 600)
 
-func_pred_plot(x = test_y,
-               # y = field3T_prediction_stepAIC_ACC_factor,
-               y = field3T_prediction_stepAIC_ACC_factor2,
-               main_text = "reduced reg model with scaled data",
-               labels = field3_testT$accession)
+# reduced + full model
+plot_abs_diff_all <- 
+  pred_all_loocv_mean_df %>%
+  ggplot(., aes(x = measured, y = abs_diff, color = model, group = model)) + 
+  geom_point() + facet_wrap(~data) +
+  geom_smooth()
 
-func_pred_plot(x = test_y,
-               y = field3_predictionACC_factor,
-               main_text = "full reg model (factor)",
-               labels = field3_test$accession)
-
-# func_pred_plot(x = test_y,
-#                y = field3_predictionACC_norm,
-#                main_text = "regression model (norm BBCH)",
-#                labels = field3_test$accession)
-dev.off()
+ggsave(filename = "figures/predictions_loocv_abs_diff_all.png", 
+       plot = plot_abs_diff_all, width = 8, height = 5, dpi = 600)
 ```
 
-## compare different models field 4
-```{r compare different models field 4}
-test_y <- field4_test$LT50ACC
-range(test_y)
-lim_values <- c(-11.5, -5.5)
+## Compare training/test CV with LOO-CV results
+```{r Compare training/test CV with LOO-CV results}
+# merge training/test CV with LOO-CV results
+pred_test_loocv_mean_df <-
+  pred_all_loocv_mean_df %>%
+  filter(model == "prediction (full model)") %>%
+  inner_join(pred_test_mean_df, by = c("data", "accession"))
 
-pdf("figures/field4_compare_model_validation.pdf", 8, 8)
-par(mfrow=c(2,2))
-func_pred_plot(x = test_y,
-               y = field4_lasso_ACC_pred_test_lambda,
-               main_text = "lasso model",
-               labels = field4_test$accession)
+# scatterplot of absolute difference of LOOCV vs. training/test set
+pred_test_loocv_mean_df %>%
+  ggplot(., aes(x = abs_diff, y = abs_diff_full)) +
+  geom_point() + facet_wrap(~data) +
+  xlab("abs diff from LOOCV") + ylab("abs diff from test validation")
 
-# func_pred_plot(x = test_y,
-#                y = field4_predictionACC,
-#                main_text = "regression model",
-#                labels = field4_test$accession)
+# scatterplot of absolute difference of LOOCV vs. training/test set --> difference between both abs_diff
+pred_test_loocv_mean_df %>%
+  mutate(loocv_test = abs_diff - abs_diff_full) %>%
+  ggplot(., aes(x = accession, y = loocv_test)) +
+  geom_bar(position = position_dodge(), stat = "identity") +
+  facet_wrap(~data)
 
-func_pred_plot(x = test_y,
-               y = field4T_predictionACC_factor,
-               main_text = "full reg model with scaled data",
-               labels = field4_testT$accession)
+# barplot of absolute difference of LOOCV vs. training/test set
+pred_test_loocv_mean_df %>%
+  dplyr::select(data, accession, abs_diff, abs_diff_full) %>%
+  rename(loocv = abs_diff) %>%
+  rename(test = abs_diff_full) %>%
+  pivot_longer(cols = c(loocv, test), names_to = "validation", values_to = "abs_diff") %>%
+  ggplot(., aes(y = abs_diff, x = accession, fill = validation)) +
+  geom_bar(position = position_dodge(), stat = "identity") + facet_wrap(~data) 
+```
 
-func_pred_plot(x = test_y,
-               y = field4T_prediction_stepAIC_ACC_factor,
-               main_text = "reduced reg model with scaled data",
-               labels = field4_testT$accession)
+--> sometimes the absolute difference from LOOCV is lower and sometimes the training/test set one
+--> no clear preference for one of the two
 
 
-func_pred_plot(x = test_y,
-               y = field4_predictionACC_factor,
-               main_text = "full reg model (factor)",
-               labels = field4_test$accession)
+## Barplot of mean per accession (full model)
+```{r Barplot of mean per accession (full model)}
+pred_full_loocv_mean_longer <-
+  pred_full_loocv_mean_df %>%
+  dplyr::select(-predicted_n, -abs_diff) %>%
+  dplyr::rename("mean_predicted" = predicted) %>%
+  dplyr::rename("se_predicted" = predicted_se) %>%
+  dplyr::rename("mean_measured" = measured) %>%
+  dplyr::rename("se_measured" = SE_LT50ACC) %>%
+  pivot_longer(cols = -c(data, accession),
+               names_to = c(".value", "set"), 
+               names_pattern = "(.*)_(.*)") %>%
+  left_join(lt50[,c(1,3)], by = c("accession" = "Accession"))
 
-# func_pred_plot(x = test_y,
-#                y = field4_predictionACC_norm,
-#                main_text = "regression model (norm BBCH)",
-#                labels = field4_test$accession)
-dev.off()
+barplot_pred_full_loocv_mean <- 
+  pred_full_loocv_mean_longer %>%
+  ggplot(., aes(x = reorder(accession, LT50ACC), y = mean, fill = set)) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                  width = 0.2,                    # Width of the error bars
+                  position=position_dodge(0.9)) +
+  facet_rep_wrap(~data, ncol=1, repeat.tick.labels = 'all') +
+  scale_fill_manual(name  = "", values = pal_grey[c(1,3)]) +
+  theme_bw() + xlab("accession") + 
+  ylab(expression("LT"[50]*"ACC (°C)")) +
+  theme(axis.text.x  = element_text(angle=90, hjust=1), legend.position = "bottom")
+
+ggsave(filename = "figures/predictions_loocv_barplot_mean.png", 
+       plot = barplot_pred_full_loocv_mean, width = 10, height = 12, dpi = 600)
+```
+
+## Barplot of mean per accession (reduced and full model)
+```{r Barplot of mean per accession (reduced and full model)}
+# combine full and reduced model prediction results
+pred_all_loocv_mean_longer <-
+  pred_red_loocv_mean_df %>%
+  dplyr::select(-predicted_n, -abs_diff) %>%
+  dplyr::rename("mean_predictedR" = predicted) %>%
+  dplyr::rename("se_predictedR" = predicted_se) %>%
+  dplyr::rename("mean_measured" = measured) %>%
+  dplyr::rename("se_measured" = SE_LT50ACC) %>%
+  bind_cols(pred_full_loocv_mean_df[,3:4]) %>%
+  dplyr::rename("mean_predictedF" = predicted) %>%
+  dplyr::rename("se_predictedF" = predicted_se) %>%
+  pivot_longer(cols = -c(data, accession),
+               names_to = c(".value", "set"), 
+               names_pattern = "(.*)_(.*)") %>%
+  left_join(lt50[,c(1,3)], by = c("accession" = "Accession"))
+
+levels(pred_all_loocv_mean_longer$data) <- c("Field 2007/08", "Field 2008/09", "Field 2009/10")
+
+barplot_all_pred_loocv_mean <- 
+  pred_all_loocv_mean_longer %>%
+  ggplot(., aes(x = reorder(accession, LT50ACC), y = mean, fill = set)) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                  width = 0.2,                    # Width of the error bars
+                  position=position_dodge(0.9)) +
+  facet_rep_wrap(~data, ncol=1, repeat.tick.labels = 'all') +
+  scale_fill_manual(name  = "",
+                    values = pal_grey, #brewer.pal(n = 4, "Paired")[2:4],
+                    breaks = c("measured", "predictedF", "predictedR"),
+                    labels = c("measured", "predicted full model", "predicted reduced model")) +
+  theme_bw() + xlab("accession") + 
+  ylab(expression("LT"[50]*"ACC (°C)")) +
+  theme(axis.text.x  = element_text(angle=90, hjust=1), legend.position = "bottom")
+
+ggsave(filename = "figures/predictions_loocv_barplot_mean_all.png", 
+       plot = barplot_all_pred_loocv_mean, width = 9, height = 10, dpi = 600)
 ```
 
 
@@ -1779,19 +1517,81 @@ Control <- trainControl(#method = "LOOCV",
                         verboseIter = TRUE)
 ```
 
-### plot
-```{r plot}
-field4_pred_loocv <- func_calc_loocv_caret(field4, method_val = "lasso", eGrid_val = eGrid_lasso)
-field4_known_LT50 <- field4$LT50ACC[which(field4$accession %in% accessions_known)]
-plot(field4_known_LT50, field4_pred_loocv)
+## Lasso: LOO-CV models
+```{r Lasso: LOO-CV models}
+field2_pred_loocv <- func_calc_loocv_caret(field_data = field2_scaled, 
+                                           method_val = "lasso", 
+                                           eGrid_val = eGrid_lasso)
 
-par(mfrow=c(1,1))
-func_pred_plot(x = field4_known_LT50,
-               y = field4_pred_loocv,
+field3_pred_loocv <- func_calc_loocv_caret(field_data = field3_scaled, 
+                                           method_val = "lasso", 
+                                           eGrid_val = eGrid_lasso)
+
+field4_pred_loocv <- func_calc_loocv_caret(field_data = field4_scaled, 
+                                           method_val = "lasso", 
+                                           eGrid_val = eGrid_lasso)
+```
+
+## Modify results and join with LT50
+```{r Modify results and join with LT50}
+field2_pred_loocv <- 
+  field2_pred_loocv %>%
+  left_join(lt50, by = c("accession" = "Accession"))
+
+field3_pred_loocv <- 
+  field3_pred_loocv %>%
+  left_join(lt50, by = c("accession" = "Accession"))
+
+field4_pred_loocv <- 
+  field4_pred_loocv %>%
+  left_join(lt50, by = c("accession" = "Accession"))
+```
+
+## Correlation between measured and predicted LT50
+```{r Correlation between measured and predicted LT50}
+plot(field2_pred_loocv$LT50ACC, field2_pred_loocv$predicted)
+cor.test(field2_pred_loocv$LT50ACC, field2_pred_loocv$predicted) # 0.41135
+
+plot(field3_pred_loocv$LT50ACC, field3_pred_loocv$predicted)
+cor.test(field3_pred_loocv$LT50ACC, field3_pred_loocv$predicted) # 0.3131
+
+plot(field4_pred_loocv$LT50ACC, field4_pred_loocv$predicted)
+cor.test(field4_pred_loocv$LT50ACC, field4_pred_loocv$predicted) # 0.5310876 
+```
+
+## Plot Lasso predictions
+```{r plot Lasso predictions}
+# par(mfrow=c(1,1))
+par(mfrow=c(1,2))
+
+func_pred_plot(x = field2_pred_loocv$LT50ACC,
+               y = field2_pred_loocv$predicted,
                main_text = "lasso model",
-               labels = names(field4_pred_loocv))
+               labels = field2_pred_loocv$accession)
+func_pred_plot(x = field2_pred_cv$measured,
+               y = field2_pred_cv$predicted,
+               main_text = "LOOCV linear reg model",
+               labels = field2_pred_cv$accession)
 
 
+func_pred_plot(x = field3_pred_loocv$LT50ACC,
+               y = field3_pred_loocv$predicted,
+               main_text = "lasso model",
+               labels = field3_pred_loocv$accession)
+func_pred_plot(x = field3_pred_cv$measured,
+               y = field3_pred_cv$predicted,
+               main_text = "LOOCV linear reg model",
+               labels = field3_pred_cv$accession)
+
+
+func_pred_plot(x = field4_pred_loocv$LT50ACC,
+               y = field4_pred_loocv$predicted,
+               main_text = "lasso model",
+               labels = field4_pred_loocv$accession)
+func_pred_plot(x = field4_pred_cv$measured,
+               y = field4_pred_cv$predicted,
+               main_text = "LOOCV linear reg model",
+               labels = field4_pred_cv$accession)
 ```
 
 
@@ -1826,39 +1626,36 @@ glmnetFit_f3T <- train(x = x_f3_train_caret,
                    tuneGrid = eGrid,
                    trControl = Control)
 
-lassoFit_f3$bestTune # alpha: 1
+lassoFit_f3T$bestTune # alpha: 1
 # 0.754
 # R2: 0.2149733
 
-glmnetFit_f3$bestTune
+glmnetFit_f3T$bestTune
 # original training data
 # alpha: 0, lambda: 0.3237 --> ridge regression
 # R2: 0.1481273, R: 0.385, RMSE: 1.61
 
 # glmnet
-table(coef(netFit_f3$finalModel, s = netFit_f3$bestTune$lambda)[,1] != 0)
+table(coef(glmnetFit_f3T$finalModel, s = glmnetFit_f3T$bestTune$lambda)[,1] != 0)
 # 4874 predictors (+ intercept) have coefficients that are not zero, the rest was removed
 
 # table(coef(netFit_f3$finalModel, s = netFit_f3$bestTune$fraction)[,1] != 0)
 
-plot(lassoFit_f3, metric = "Rsquared")
 plot(lassoFit_f3T, metric = "Rsquared")
-plot(lassoFit_f3, metric = "RMSE")
-plot(glmnetFit_f3, metric = "Rsquared")
+plot(lassoFit_f3T, metric = "RMSE")
 plot(glmnetFit_f3T, metric = "Rsquared")
 
-plot(y_f3_test, predict(netFit_f3, newdata = x_f3_test))
-cor.test(y_f3_test, predict(lassoFit_f3, newdata = x_f3_test)) #  0.558
-cor.test(y_f3_test, predict(glmnetFit_f3, newdata = x_f3_test)) # 0.569
-cor.test(y_f3_train_caret, predict(lassoFit_f3, newdata = x_f3_train_caret))  # 0.53
-cor.test(y_f3_train_caret, predict(glmnetFit_f3, newdata = x_f3_train_caret)) # 0.521
+cor.test(y_f3_test, predict(lassoFit_f3T, newdata = x_f3_test)) #  0.582
+cor.test(y_f3_test, predict(glmnetFit_f3T, newdata = x_f3_test)) # 0.622
+cor.test(y_f3_train_caret, predict(lassoFit_f3T, newdata = x_f3_train_caret))  # 0.503
+cor.test(y_f3_train_caret, predict(glmnetFit_f3T, newdata = x_f3_train_caret)) # 0.505
 
-plot(field3_train$LT50ACC, predict(netFit_f3, newdata = x_f3_train_caret), 
-     ylim=range(field3_train$LT50ACC), col="white")
-text(field3_train$LT50ACC, predict(netFit_f3, newdata = x_f3_train_caret),
-     labels = as.character(field3_train$accession), cex = 0.8)
+plot(field3_trainT$LT50ACC, predict(lassoFit_f3T, newdata = x_f3_train_caret), 
+     ylim=range(field3_trainT$LT50ACC), col="white")
+text(field3_trainT$LT50ACC, predict(lassoFit_f3T, newdata = x_f3_train_caret),
+     labels = as.character(field3_trainT$accession), cex = 0.8)
 abline(0, 1, col = "grey")
-abline(lm(predict(netFit_f3, newdata = x_f3_train_caret) ~ field3_train$LT50ACC), col = "red")
+abline(lm(predict(lassoFit_f3T, newdata = x_f3_train_caret) ~ field3_trainT$LT50ACC), col = "red")
 ```
 
 ## try out training with first fold of training data: field 4
@@ -2019,7 +1816,7 @@ hist(cor_int_c$coeff)
 
 # Save workspace
 ```{r save workspace}
-save.image("metabolite_arafield_model.RData")
+save.image("metabolite_arafield_model_lt50_acc.RData")
 sessionInfo()
 ```
 
