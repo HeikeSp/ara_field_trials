@@ -112,7 +112,7 @@ dev.off()
 # Histograms to vizualize distribution of metabolite values 
 ```{r histograms to vizualize distribution of metabolite values}
 
-func_hist <- function(x_values, main_text, xlab_text = "concentration in ?mol/g FW", 
+func_hist <- function(x_values, main_text, xlab_text = "concentration in µmol/g FW", 
                       ylab_text = "relative frequency", text_y = 0.05, ylim_values = NULL){
   hist(x_values, ylim = ylim_values,
        freq = FALSE, main = main_text,
@@ -134,13 +134,13 @@ pdf("figures/LT50_Histogramme.pdf")
 par(mar=c(5.1, 5.1, 4.1, 2.1))
 
 func_hist(lt50$LT50NAC, main_text = "freezing tolerance non-acclimated plants",
-          xlab_text = expression("LT"[50]*"NAC in ?C"))
+          xlab_text = expression("LT"[50]*"NAC in °C"))
 
 func_hist(lt50$LT50ACC, main_text = "freezing tolerance acclimated plants",
-          xlab_text = expression("LT"[50]*"ACC in ?C"))
+          xlab_text = expression("LT"[50]*"ACC in °C"))
 
 func_hist(lt50$Capacity, main_text = "acclimation capacity",
-          xlab_text = expression("acclimation capacity of LT"[50]*" in ?C"))
+          xlab_text = expression("acclimation capacity of LT"[50]*" in °C"))
 dev.off()
 ```
 
@@ -395,7 +395,7 @@ metabolite_arafield4$prolineT <- func_bc_transform(metabolite_arafield4$proline_
 # Plots for transformation of metabolite values
 ```{r plots for transformation of metabolite values}
 # define function for plot of histogram and box-cox-plot of (un)transformed metabolite values
-func_plot_transform <- function(x_values, main_text, xlab_text = "concentration in ?mol/g FW", 
+func_plot_transform <- function(x_values, main_text, xlab_text = "concentration in µmol/g FW", 
                                 ylab_text = "relative frequency", text_y = 0.05, ylim_values = NULL,
                                 x_transformed){
   hist(x_values, ylim = ylim_values,
