@@ -8,7 +8,6 @@
 *.tsv.gz
 *.pdf
 *.html
-*.md
 *.txt
 *.png
 *.jpg
