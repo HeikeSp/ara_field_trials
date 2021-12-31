@@ -16,10 +16,11 @@ editor_options:
 
 # Set working directory  
 ```{r set working directory}
-#getwd()
-#setwd("D:/work/repos/ara_field_trials/")
-#setwd("~/work/repos/ara_field_trials/")
-setwd("X:/mpimp/repos/ara_field_trials")
+# getwd()
+# setwd("D:/work/repos/ara_field_trials/")
+# setwd("~/work/repos/ara_field_trials/")
+# setwd("X:/mpimp/repos/ara_field_trials")
+setwd("~/sync/Seafile/uschi-work/repos/ara_field_trials")
 ```
 
 

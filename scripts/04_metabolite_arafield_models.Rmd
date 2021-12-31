@@ -19,8 +19,9 @@ editor_options:
 #getwd()
 # setwd("D:/work/repos/ara_field_trials/")
 # setwd("X:/mpimp/repos/ara_field_trials")
-setwd("E:/uschi-home-sync/uschi/Seafile/uschi-work/repos/ara_field_trials")
-setwd("/media/uschi/seagate/uschi-home-sync/uschi/Seafile/uschi-work/repos/ara_field_trials")
+# setwd("E:/uschi-home-sync/uschi/Seafile/uschi-work/repos/ara_field_trials")
+# setwd("/media/uschi/seagate/uschi-home-sync/uschi/Seafile/uschi-work/repos/ara_field_trials")
+setwd("~/sync/Seafile/uschi-work/repos/ara_field_trials")
 ```
 
 # Load workspace, packages and scripts

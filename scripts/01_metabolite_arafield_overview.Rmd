@@ -16,10 +16,11 @@ editor_options:
 
 # Set working directory  
 ```{r set working directory}
-#getwd()
-#setwd("D:/work/repos/ara_field_trials/")
-#setwd("~/work/repos/ara_field_trials/")
-setwd("X:/mpimp/repos/ara_field_trials")
+# getwd()
+# setwd("D:/work/repos/ara_field_trials/")
+# setwd("~/work/repos/ara_field_trials/")
+# setwd("X:/mpimp/repos/ara_field_trials")
+setwd("~/sync/Seafile/uschi-work/repos/ara_field_trials")
 ```
 
 # Load workspace, packages and scripts
@@ -34,7 +35,7 @@ opts_chunk$set(fig.width=6, fig.height=5, tidy=TRUE, tidy.opts=list(width.cutoff
 opts_knit$set(root.dir = '../')
 
 # load workspace
-#load("metabolite_arafield.RData")
+# load("metabolite_arafield.RData")
 ```
 
 # Load data
