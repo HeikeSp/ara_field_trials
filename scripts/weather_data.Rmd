@@ -1,5 +1,5 @@
 ---
-title: "Weatger data of Arabidopsis field trials"
+title: "Weather data of Arabidopsis field trials"
 author: "Heike Sprenger"
 date: "Monday, July 10, 2017"
 output:
@@ -16,7 +16,7 @@ output:
 ```{r set working directory}
 #getwd()
 #setwd("D:/work/repos/ara_field_trials/")
-setwd("X:/mpimp/repos/ara_field_trials/")
+# setwd("X:/mpimp/repos/ara_field_trials/")
 ```
 
 # Load workspace, packages and scripts
@@ -141,7 +141,7 @@ temp_plot <- ggplot(wetter, aes(x = Date2, y = Temp, group = Feld)) +
   theme_pubr() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   geom_hline(aes(yintercept=0), colour="#BB0000") + 
-  ylab("Temperature (°C)") + xlab("Date")
+  ylab("Temperature (?C)") + xlab("Date")
 
 pdf("figures/weather_temp.pdf", width = 10, height = 5)
 print(temp_plot)
@@ -163,7 +163,7 @@ t.test(wetter$Temp[wetter$Feld=="Feld3"], wetter$Temp[wetter$Feld=="Feld4"])
 # mean of x  mean of y 
 # -0.4433962 -1.3929245 
 
-# Oktober bis März (ohne April)
+# Oktober bis M?rz (ohne April)
 t.test(wetter$Temp[wetter$Feld=="Feld4"][1:182],wetter$Temp[wetter$Feld=="Feld3"][1:182])
 # p-value = 0.2118
 # mean of x mean of y 
@@ -242,7 +242,7 @@ dev.off()
 # pdf("figures/SnowDepth.pdf", height=16, width=12)
 # par(mfrow=c(2,1))
 # barplot(height=schnee$V2, width=c(0.833), col="light grey", ylim=c(0,40), main="Schneetiefe 2009/10", ylab="Schneetiefe in cm", xlab="Monat", xaxt="n", border=T)
-# axis(at=seq(1:212), labels=c(rep("",14),"Oktober",rep("",30),"November",rep("",29),"Dezember",rep("",30),"Januar",rep("",29),"Februar",rep("",28),"März",rep("",30),"April",rep("",15) ), side=1, hadj=1, padj=1, cex.axis=0.7, las=2, lwd.ticks=0, pos=0)
+# axis(at=seq(1:212), labels=c(rep("",14),"Oktober",rep("",30),"November",rep("",29),"Dezember",rep("",30),"Januar",rep("",29),"Februar",rep("",28),"M?rz",rep("",30),"April",rep("",15) ), side=1, hadj=1, padj=1, cex.axis=0.7, las=2, lwd.ticks=0, pos=0)
 # abline(v=c(0,31,61,92,123,151,182,212), col="grey")
 # dev.off()      
 
@@ -252,7 +252,7 @@ t.test(wetter$Schnee[wetter$Feld=="Feld3"], wetter$Schnee[wetter$Feld=="Feld4"])
 # mean of x mean of y 
 # 1.358491  7.792453  
 
-# --> deutlicher Unterschied bezüglich der Schneedecke
+# --> deutlicher Unterschied bez?glich der Schneedecke
 ```
 
 
@@ -318,9 +318,9 @@ t.test(wetter$Sonne[wetter$Feld=="Feld3"], wetter$Sonne[wetter$Feld=="Feld4"])
 # mean of x mean of y 
 # 193.5566  163.5849 
 
-# --> kein signifikanter Unterschied bezüglich der Sonnenscheindauer
+# --> kein signifikanter Unterschied bez?glich der Sonnenscheindauer
 
-# Oktober bis März (ohne April)
+# Oktober bis M?rz (ohne April)
 t.test(wetter$Sonne[wetter$Feld=="Feld4"][1:182],wetter$Sonne[wetter$Feld=="Feld3"][1:182])
 #t = -0.4463, df = 360.808, p-value = 0.6556
 #mean of x mean of y 
