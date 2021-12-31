@@ -2,6 +2,7 @@
 .Rhistory
 *.RData
 *.xlsx
+*.docx
 *.ppt
 *.tsv
 *.tsv.gz
@@ -9,4 +10,7 @@
 *.html
 *.md
 *.txt
+*.png
+*.jpg
+*.db
 /.project
